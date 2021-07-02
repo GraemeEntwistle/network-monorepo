@@ -1,5 +1,6 @@
 import StreamrClient from '../..'
 import { StreamPermission, Stream, StreamProperties } from '../index'
+import * as gql from 'gql-query-builder'
 
 import { Contract } from '@ethersproject/contracts'
 // import { Wallet } from '@ethersproject/wallet'
@@ -12,6 +13,10 @@ import StreamRegistryArtifact from './StreamRegistryArtifact.json'
 import fetch, { Response } from 'node-fetch'
 import { EthereumAddress } from '../../types'
 import { BigNumber } from 'ethers'
+import { Errors } from 'streamr-client-protocol'
+
+const { ValidationError } = Errors
+
 // const fetch = require('node-fetch');
 const log = debug('StreamrClient::StreamRegistryOnchain')
 
@@ -85,8 +90,14 @@ export class StreamRegistryOnchain {
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
         console.log(JSON.stringify(resJson))
-        return resJson.data.streams.map((streamobj: any) => {
-            return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata))
+        return resJson.data.stream.permissions.map((streamobj: any) => {
+            // return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata))
+            const permission = {
+                ...streamobj,
+                stremId: streamobj.id
+            }
+            delete permission.id
+            return permission
         })
     }
 
@@ -124,23 +135,38 @@ export class StreamRegistryOnchain {
 
     static buildGetPermissionGQLQuery(streamid: string): string {
         //    id: "0x4178babe9e5148c6d5fd431cd72884b07ad855a0/"}) {
-        const query = `{
-            streams (  where: { 
-              id: "${streamid}"}) {
-             id,
-             metadata,
-             permissions {
-               id,
-               userAddress,
-               edit,
-               canDelete,
-               publishExpiration,
-               subscribeExpiration,
-               share,
-             }
-           }
-         }`
-        return JSON.stringify({ query })
+        const queryWithVars = gql.query({
+            operation: 'stream',
+            fields: ['id', 'metadata', {
+                permissions: ['id',
+                    'userAddress',
+                    'edit',
+                    'canDelete',
+                    'publishExpiration',
+                    'subscribeExpiration',
+                    'share'
+                ]
+            }],
+            variables: { id: streamid },
+        })
+
+        // const query = `{
+        //     streams (  where: {
+        //       id: "${streamid}"}) {
+        //      id,
+        //      metadata,
+        //      permissions {
+        //        id,
+        //        userAddress,
+        //        edit,
+        //        canDelete,
+        //        publishExpiration,
+        //        subscribeExpiration,
+        //        share,
+        //      }
+        //    }
+        //  }`
+        return JSON.stringify(queryWithVars)
     }
 
     static buildGetStreamGQLQuery(): string {
@@ -173,25 +199,30 @@ export class StreamRegistryOnchain {
     async createStream(props?: StreamProperties): Promise<Stream> {
         let properties = props || {}
         await this.connectToEthereum()
+        const userAddress: string = (await this.ethereum.getAddress()).toLowerCase()
         log('creating/registering stream onchain')
         // const a = this.ethereum.getAddress()
         const propsJsonStr : string = JSON.stringify(properties)
-        let { path } = properties
-        if (!path && properties.id && properties.id.includes('/')) {
+        let path = '/'
+        if (properties.id && properties.id.includes('/')) {
             path = properties.id.slice(properties.id.indexOf('/'), properties.id.length)
         }
-        path = path || '/'
+
+        if (properties.id && !properties.id.startsWith('/') && !properties.id.startsWith(userAddress)) {
+            throw new ValidationError('Id does not match senders address')
+            // TODO add check for ENS??
+        }
         // const path = properties.path || '/'
         // const properties = this.streamRegistry.getStreamMetadata(id) as StreamProperties
 
         // console.log('#### ' + path + ' ' + propsJsonStr)
+
         const tx = await this.streamRegistry?.createStream(path, propsJsonStr)
         await tx?.wait()
-        const id = await (await this.ethereum.getAddress()).toLowerCase() + path
+        const id = userAddress + path
         properties = {
             ...properties,
-            id,
-            path
+            id
         }
         // console.log('txreceipt' + JSON.stringify(txreceipt))
         // // TODO check for success

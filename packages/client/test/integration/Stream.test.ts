@@ -29,7 +29,7 @@ describe('Stream', () => {
         const randompath = '/' + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 10)
         testProps = {
             name: uid('stream-integration-test'),
-            path: randompath
+            id: randompath
         }
         userAddress = (await client.ethereum.getAddress()).toLowerCase()
         streamId = await userAddress + randompath
@@ -67,7 +67,7 @@ describe('Stream', () => {
             // expect(permissions[4].operation).toEqual(StreamOperation.STREAM_SHARE)
             for (const permission of permissions) {
                 // const directpermission: StreamPermission = permission as StreamPermission
-                expect(permission.user.toLowerCase()).toEqual(userAddress)
+                expect(permission.userAddress.toLowerCase()).toEqual(userAddress)
             }
         })
         it('listStreams', async () => {

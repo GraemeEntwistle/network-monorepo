@@ -17,9 +17,9 @@ export type StreamPartDefinition = string | StreamPartDefinitionOptions
 export type ValidatedStreamPartDefinition = { streamId: string, streamPartition: number, key: string}
 
 export interface StreamPermission {
-    streamid: string
+    streamId: string
     // operation: StreamOperation
-    user: string
+    userAddress: string
     edit: boolean
     canDelete: boolean
     publishExpiration: BigNumber
@@ -47,7 +47,6 @@ export enum StreamOperation {
 
 export class StreamProperties {
     id?: string
-    path?: string
     name?: string
     description?: string
     config?: {
