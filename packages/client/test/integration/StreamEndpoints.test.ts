@@ -13,10 +13,11 @@ jest.setTimeout(15000)
 /**
  * These tests should be run in sequential order!
  */
-
+let counter = 0
 const getNewProps = () => {
+    counter += 1
     return {
-        id: '/path-' + Date.now()
+        id: '/path-' + Date.now() + '-' + counter
     }
 }
 
@@ -106,7 +107,7 @@ function TestStreamEndpoints(getName: () => string) {
 
     describe('getStreamByName', () => {
         it('get an existing Stream', async () => {
-            const stream = await client.createStream()
+            const stream = await client.createStream(getNewProps())
             const existingStream = await client.getStreamByName(stream.name)
             expect(existingStream.id).toEqual(stream.id)
         })

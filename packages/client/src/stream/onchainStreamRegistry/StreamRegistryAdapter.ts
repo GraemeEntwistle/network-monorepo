@@ -1,6 +1,5 @@
 import StreamrClient from '../..'
 import { StreamPermission, Stream, StreamProperties } from '../index'
-import * as gql from 'gql-query-builder'
 
 import { Contract } from '@ethersproject/contracts'
 // import { Wallet } from '@ethersproject/wallet'
@@ -71,7 +70,7 @@ export class StreamRegistryOnchain {
         console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
-        if (resJson.errors.length > 0) {
+        if (resJson.errors && resJson.errors.length > 0) {
             throw new Error('failed to get streams from theGraph ' + JSON.stringify(resJson.errors))
         }
         console.log(JSON.stringify(resJson))
@@ -85,7 +84,7 @@ export class StreamRegistryOnchain {
         log('getting all streams from thegraph')
         // const a = this.ethereum.getAddress()
         // console.log(id);
-        const query: string = StreamRegistryOnchain.buildGetPermissionGQLQuery(streamid)
+        const query: string = StreamRegistryOnchain.buildGetSingleStreamQuery(streamid)
         console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
@@ -135,39 +134,69 @@ export class StreamRegistryOnchain {
 
     static buildGetPermissionGQLQuery(streamid: string): string {
         //    id: "0x4178babe9e5148c6d5fd431cd72884b07ad855a0/"}) {
-        const queryWithVars = gql.query({
-            operation: 'stream',
-            fields: ['id', 'metadata', {
-                permissions: ['id',
-                    'userAddress',
-                    'edit',
-                    'canDelete',
-                    'publishExpiration',
-                    'subscribeExpiration',
-                    'share'
-                ]
-            }],
-            variables: { id: streamid },
-        })
+        // const queryWithVars = gql.query({
+        //     operation: 'stream',
+        //     fields: ['id', 'metadata', {
+        //         permissions: ['id',
+        //             'userAddress',
+        //             'edit',
+        //             'canDelete',
+        //             'publishExpiration',
+        //             'subscribeExpiration',
+        //             'share'
+        //         ]
+        //     }],
+        //     variables: { id: streamid },
+        // })
 
-        // const query = `{
-        //     streams (  where: {
-        //       id: "${streamid}"}) {
-        //      id,
-        //      metadata,
-        //      permissions {
-        //        id,
-        //        userAddress,
-        //        edit,
-        //        canDelete,
-        //        publishExpiration,
-        //        subscribeExpiration,
-        //        share,
-        //      }
-        //    }
-        //  }`
-        return JSON.stringify(queryWithVars)
+        const query = `{
+            stream (  where: {
+              id: "${streamid}"}) {
+             id,
+             metadata,
+             permissions {
+               id,
+               userAddress,
+               edit,
+               canDelete,
+               publishExpiration,
+               subscribeExpiration,
+               share,
+             }
+           }
+         }`
+        return JSON.stringify({ query })
     }
+
+    static buildGetSingleStreamQuery(streamid: string): string {
+
+        const query = `{
+            stream (id: "${streamid}") {
+             id,
+             metadata,
+             permissions {
+               id,
+               userAddress,
+               edit,
+               canDelete,
+               publishExpiration,
+               subscribeExpiration,
+               share,
+             }
+           }
+         }`
+        return JSON.stringify({ query })
+    }
+
+    // search contains query
+    // {
+    //     streams (where: {metadata_contains: "name\\\":\\\"p55648-test-stream"}) 
+    //       { id, metadata, permissions 
+    //         { id, userAddress, edit, canDelete, publishExpiration, 
+    //           subscribeExpiration, share 
+    //         } 
+    //       } 
+    //   }
 
     static buildGetStreamGQLQuery(): string {
         //    id: "0x4178babe9e5148c6d5fd431cd72884b07ad855a0/"}) {
@@ -186,8 +215,8 @@ export class StreamRegistryOnchain {
             parsedProps = JSON.parse(propsString)
             parsedProps = {
                 ...parsedProps,
-                id,
-                path: id.substring(id.indexOf('/'))
+                id
+                // path: id.substring(id.indexOf('/'))
             }
         } catch (error) {
             // throw new Error(`could not parse prperties from onachein metadata: ${propsString}`)
@@ -216,7 +245,7 @@ export class StreamRegistryOnchain {
         // const properties = this.streamRegistry.getStreamMetadata(id) as StreamProperties
 
         // console.log('#### ' + path + ' ' + propsJsonStr)
-
+        console.log('####### creating stream with path ' + path)
         const tx = await this.streamRegistry?.createStream(path, propsJsonStr)
         await tx?.wait()
         const id = userAddress + path
@@ -233,15 +262,15 @@ export class StreamRegistryOnchain {
     }
     // Promise<StreamPermision[]
 
-    async getPermissionsForUser(streamid: string): Promise<StreamPermission> {
+    async getPermissionsForUser(streamId: string): Promise<StreamPermission> {
         await this.connectToEthereum()
         const userAddress: EthereumAddress = await this.ethereum.getAddress()
         log('getting permission for stream for user')
-        const permissions = await this.streamRegistry?.getPermissionsForUser(streamid, userAddress)
+        const permissions = await this.streamRegistry?.getPermissionsForUser(streamId, userAddress)
         return {
-            streamid,
+            streamId,
             // operation: StreamOperation
-            user: userAddress,
+            userAddress,
             edit: permissions?.edit || false,
             canDelete: permissions?.canDelete || false,
             publishExpiration: permissions?.publishExpiration || new BigNumber(null, '0x0'),
