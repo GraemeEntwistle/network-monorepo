@@ -121,7 +121,7 @@ export class StreamEndpoints {
         // const url = getEndpointUrl(this.client.options.restUrl, 'streams') + '?' + qs.stringify(query)
         // const json = await authFetch<StreamProperties[]>(url, this.client.session)
         // return json ? json.map((stream: StreamProperties) => new Stream(this.client, stream)) : []
-        return this.streamRegistryOnchain.getAllStreams()
+        return this.streamRegistryOnchain.getFilteredStreamList(query)
     }
 
     async getStreamByName(name: string) {

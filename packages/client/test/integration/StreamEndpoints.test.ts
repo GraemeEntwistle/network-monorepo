@@ -1,6 +1,6 @@
 import { ethers, Wallet } from 'ethers'
 // import { NotFoundError, ValidationError } from '../../src/rest/authFetch'
-import { Stream, StreamOperation } from '../../src/stream'
+import { Stream, StreamOperation, StreamProperties } from '../../src/stream'
 import { StorageNode } from '../../src/stream/StorageNode'
 
 import { StreamrClient } from '../../src/StreamrClient'
@@ -14,7 +14,7 @@ jest.setTimeout(15000)
  * These tests should be run in sequential order!
  */
 let counter = 0
-const getNewProps = () => {
+const getNewProps = () : StreamProperties => {
     counter += 1
     return {
         id: '/path-' + Date.now() + '-' + counter
@@ -46,13 +46,13 @@ function TestStreamEndpoints(getName: () => string) {
     })
 
     beforeAll(async () => {
-        createdStreamPath = `/StreamEndpoints-${Date.now()}`
-        createdStream = await client.createStream({
-            id: `${wallet.address.toLowerCase()}${createdStreamPath}`,
-            name: getName(),
-            requireSignedData: true,
-            requireEncryptedData: false,
-        })
+        // createdStreamPath = `/StreamEndpoints-${Date.now()}`
+        // createdStream = await client.createStream({
+        //     id: `${wallet.address.toLowerCase()}${createdStreamPath}`,
+        //     name: getName(),
+        //     requireSignedData: true,
+        //     requireEncryptedData: false,
+        // })
     })
 
     describe('createStream', () => {
@@ -107,7 +107,10 @@ function TestStreamEndpoints(getName: () => string) {
 
     describe('getStreamByName', () => {
         it('get an existing Stream', async () => {
-            const stream = await client.createStream(getNewProps())
+            const props = getNewProps()
+            props.name = 'name-' + Date.now()
+            const stream = await client.createStream(props)
+            await new Promise((resolve) => setTimeout(resolve, 5000))
             const existingStream = await client.getStreamByName(stream.name)
             expect(existingStream.id).toEqual(stream.id)
         })
@@ -118,59 +121,59 @@ function TestStreamEndpoints(getName: () => string) {
         })
     })
 
-    // describe('getOrCreate', () => {
-    //     it('existing Stream by name', async () => {
-    //         const existingStream = await client.getOrCreateStream({
-    //             name: createdStream.name,
-    //         })
-    //         expect(existingStream.id).toBe(createdStream.id)
-    //         expect(existingStream.name).toBe(createdStream.name)
-    //     })
+    describe('getOrCreate', () => {
+        it('existing Stream by name', async () => {
+            const existingStream = await client.getOrCreateStream({
+                name: createdStream.name,
+            })
+            expect(existingStream.id).toBe(createdStream.id)
+            expect(existingStream.name).toBe(createdStream.name)
+        })
 
-    //     it('existing Stream by id', async () => {
-    //         const existingStream = await client.getOrCreateStream({
-    //             id: createdStream.id,
-    //         })
-    //         expect(existingStream.id).toBe(createdStream.id)
-    //         expect(existingStream.name).toBe(createdStream.name)
-    //     })
+        it('existing Stream by id', async () => {
+            const existingStream = await client.getOrCreateStream({
+                id: createdStream.id,
+            })
+            expect(existingStream.id).toBe(createdStream.id)
+            expect(existingStream.name).toBe(createdStream.name)
+        })
 
-    //     it('new Stream by name', async () => {
-    //         const newName = uid('stream')
-    //         const newStream = await client.getOrCreateStream({
-    //             name: newName,
-    //         })
-    //         expect(newStream.name).toEqual(newName)
-    //     })
+        it('new Stream by name', async () => {
+            const newName = uid('stream')
+            const newStream = await client.getOrCreateStream({
+                name: newName,
+            })
+            expect(newStream.name).toEqual(newName)
+        })
 
-    //     it('new Stream by id', async () => {
-    //         const newId = `${wallet.address.toLowerCase()}/StreamEndpoints-getOrCreate-newId-${Date.now()}`
-    //         const newStream = await client.getOrCreateStream({
-    //             id: newId,
-    //         })
-    //         expect(newStream.id).toEqual(newId)
-    //     })
+        it('new Stream by id', async () => {
+            const newId = `${wallet.address.toLowerCase()}/StreamEndpoints-getOrCreate-newId-${Date.now()}`
+            const newStream = await client.getOrCreateStream({
+                id: newId,
+            })
+            expect(newStream.id).toEqual(newId)
+        })
 
-    //     it('new Stream by path', async () => {
-    //         const newPath = `/StreamEndpoints-getOrCreate-newPath-${Date.now()}`
-    //         const newStream = await client.getOrCreateStream({
-    //             id: newPath,
-    //         })
-    //         expect(newStream.id).toEqual(`${wallet.address.toLowerCase()}${newPath}`)
-    //     })
+        it('new Stream by path', async () => {
+            const newPath = `/StreamEndpoints-getOrCreate-newPath-${Date.now()}`
+            const newStream = await client.getOrCreateStream({
+                id: newPath,
+            })
+            expect(newStream.id).toEqual(`${wallet.address.toLowerCase()}${newPath}`)
+        })
 
-    //     it('fails if stream prefixed with other users address', async () => {
-    //         // can't create streams for other users
-    //         const otherAddress = `0x${fakeAddress()}`
-    //         const newPath = `/StreamEndpoints-getOrCreate-newPath-${Date.now()}`
-    //         // backend should error
-    //         await expect(async () => {
-    //             await client.getOrCreateStream({
-    //                 id: `${otherAddress}${newPath}`,
-    //             })
-    //         }).rejects.toThrow('Validation')
-    //     })
-    // })
+        it('fails if stream prefixed with other users address', async () => {
+            // can't create streams for other users
+            const otherAddress = `0x${fakeAddress()}`
+            const newPath = `/StreamEndpoints-getOrCreate-newPath-${Date.now()}`
+            // backend should error
+            await expect(async () => {
+                await client.getOrCreateStream({
+                    id: `${otherAddress}${newPath}`,
+                })
+            }).rejects.toThrow('Validation')
+        })
+    })
 
     // describe('listStreams', () => {
     //     it('filters by given criteria (match)', async () => {

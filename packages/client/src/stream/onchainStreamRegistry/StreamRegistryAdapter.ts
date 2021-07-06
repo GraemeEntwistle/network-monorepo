@@ -13,6 +13,7 @@ import fetch, { Response } from 'node-fetch'
 import { EthereumAddress } from '../../types'
 import { BigNumber } from 'ethers'
 import { Errors } from 'streamr-client-protocol'
+import { StreamListQuery } from '../../rest/StreamEndpoints'
 
 const { ValidationError } = Errors
 
@@ -54,7 +55,7 @@ export class StreamRegistryOnchain {
         await this.connectToEthereum()
         log('getting stream(properties) by id from chain')
         // const a = this.ethereum.getAddress()
-        console.log(id)
+        // console.log(id)
 
         const propertiesString = await this.streamRegistry?.getStreamMetadata(id) || '{'
 
@@ -67,13 +68,13 @@ export class StreamRegistryOnchain {
         // const a = this.ethereum.getAddress()
         // console.log(id);
         const query: string = StreamRegistryOnchain.buildGetStreamGQLQuery()
-        console.log('######' + query)
+        // console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
         if (resJson.errors && resJson.errors.length > 0) {
             throw new Error('failed to get streams from theGraph ' + JSON.stringify(resJson.errors))
         }
-        console.log(JSON.stringify(resJson))
+        // console.log(JSON.stringify(resJson))
         return resJson.data.streams.map((streamobj: any) => {
             return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata))
         })
@@ -81,14 +82,13 @@ export class StreamRegistryOnchain {
     }
     async getAllPermissionsForStream(streamid: string): Promise<Array<StreamPermission>> {
         // await this.connectToEthereum()
-        log('getting all streams from thegraph')
         // const a = this.ethereum.getAddress()
         // console.log(id);
         const query: string = StreamRegistryOnchain.buildGetSingleStreamQuery(streamid)
-        console.log('######' + query)
+        // console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
-        console.log(JSON.stringify(resJson))
+        // console.log(JSON.stringify(resJson))
         return resJson.data.stream.permissions.map((streamobj: any) => {
             // return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata))
             const permission = {
@@ -98,6 +98,29 @@ export class StreamRegistryOnchain {
             delete permission.id
             return permission
         })
+    }
+
+    async getFilteredStreamList(filter: StreamListQuery): Promise<Stream[]> {
+
+        const gqlquery: string = StreamRegistryOnchain.buildGetFilteredStreamListQuery(filter.name)
+        // console.log('######' + query)
+        const res = await this.queryTheGraph(gqlquery)
+        const resJson = await res.json()
+        // console.log(JSON.stringify(resJson))
+        const streams: Stream[] = []
+        resJson.data.streams.forEach((streamobj: any) => {
+            streamobj.permissions.map((permissionobj: any) => {
+                // return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata))
+                const permission = {
+                    ...permissionobj,
+                    stremId: permissionobj.id
+                }
+                delete permission.id
+                return permission
+            })
+            streams.push(new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata)))
+        })
+        return streams
     }
 
     async queryTheGraph(query: string): Promise<Response> {
@@ -169,7 +192,6 @@ export class StreamRegistryOnchain {
     }
 
     static buildGetSingleStreamQuery(streamid: string): string {
-
         const query = `{
             stream (id: "${streamid}") {
              id,
@@ -185,6 +207,20 @@ export class StreamRegistryOnchain {
              }
            }
          }`
+        return JSON.stringify({ query })
+    }
+
+    static buildGetFilteredStreamListQuery(name?: string): string {
+        const nameparam = name ? `metadata_contains: "name\\\\\\":\\\\\\"${name}"` : ''
+        const query = `{
+            streams (where: {${nameparam}}) 
+              { id, metadata, permissions 
+                { id, userAddress, edit, canDelete, publishExpiration, 
+                  subscribeExpiration, share 
+                } 
+              } 
+          }`
+        // return JSON.stringify({ query })
         return JSON.stringify({ query })
     }
 
@@ -245,7 +281,7 @@ export class StreamRegistryOnchain {
         // const properties = this.streamRegistry.getStreamMetadata(id) as StreamProperties
 
         // console.log('#### ' + path + ' ' + propsJsonStr)
-        console.log('####### creating stream with path ' + path)
+        // console.log('####### creating stream with path ' + path)
         const tx = await this.streamRegistry?.createStream(path, propsJsonStr)
         await tx?.wait()
         const id = userAddress + path
