@@ -8,7 +8,7 @@ export { GroupKey } from './encryption/Encryption'
 import { StorageNode } from './StorageNode'
 import { StreamrClient } from '../StreamrClient'
 import { EthereumAddress } from '../types'
-import { BigNumber } from 'ethers'
+import { BigNumber, ethers } from 'ethers'
 
 // TODO explicit types: e.g. we never provide both streamId and id, or both streamPartition and partition
 export type StreamPartDefinitionOptions = { streamId?: string, streamPartition?: number, id?: string, partition?: number, stream?: Stream|string }
@@ -39,7 +39,7 @@ export interface StreamPermission {
 export enum StreamOperation {
     // STREAM_GET = 'stream_get',
     STREAM_EDIT = 'edit',
-    STREAM_DELETE = 'delete',
+    STREAM_DELETE = 'canDelete',
     STREAM_PUBLISH = 'publishExpiration',
     STREAM_SUBSCRIBE = 'subscribeExpiration',
     STREAM_SHARE = 'share'
@@ -166,46 +166,48 @@ export class Stream {
         //     getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions', 'me'),
         //     this._client.session,
         // )
-        return this._client.streamRegistryOnchain.getAllPermissionsForStream(this.id)
+        return this._client.streamRegistryOnchain.getPermissionsForUser(this.id)
     }
 
     async hasPermission(operation: StreamOperation, userId: string) {
         // eth addresses may be in checksumcase, but userId from server has no case
 
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined // if not string then undefined
-        const permissions = await this.getPermissions()
+        // const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined // if not string then undefined
+        const permissions = await this.getMyPermissions()
 
-        return permissions.find((p: any) => {
-            if (p.operation !== operation) { return false }
+        return permissions[operation]
+        // return permissions.find((p: any) => {
+        //     if (p.operation !== operation) { return false }
 
-            if (userIdCaseInsensitive === undefined) {
-                return !!p.anonymous // match nullish userId against p.anonymous
-            }
-            return p.user && p.user.toLowerCase() === userIdCaseInsensitive // match against userId
-        })
+        //     if (userIdCaseInsensitive === undefined) {
+        //         return !!p.anonymous // match nullish userId against p.anonymous
+        //     }
+        //     return p.user && p.user.toLowerCase() === userIdCaseInsensitive // match against userId
+        // })
     }
 
     async grantPermission(operation: StreamOperation, userId: string|undefined) {
-        const permissionObject: any = {
-            operation,
-        }
+        // const permissionObject: any = {
+        //     operation,
+        // }
 
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined
+        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : ethers.constants.AddressZero
 
-        if (userIdCaseInsensitive !== undefined) {
-            permissionObject.user = userIdCaseInsensitive
-        } else {
-            permissionObject.anonymous = true
-        }
+        // if (userIdCaseInsensitive !== undefined) {
+        //     permissionObject.user = userIdCaseInsensitive
+        // } else {
+        //     permissionObject.user = '0x0'
+        // }
 
-        return authFetch<StreamPermission>(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions'),
-            this._client.session,
-            {
-                method: 'POST',
-                body: JSON.stringify(permissionObject),
-            },
-        )
+        this._client.streamRegistryOnchain.grantPermission(this.id, operation, userIdCaseInsensitive)
+        // return authFetch<StreamPermission>(
+        //     getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions'),
+        //     this._client.session,
+        //     {
+        //         method: 'POST',
+        //         body: JSON.stringify(permissionObject),
+        //     },
+        // )
     }
 
     async revokePermission(permissionId: number) {

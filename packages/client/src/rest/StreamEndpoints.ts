@@ -164,7 +164,7 @@ export class StreamEndpoints {
     /**
      * @category Important
      */
-    async getOrCreateStream(props: { id: string, name?: never } | { id?: never, name: string }) {
+    async getOrCreateStream(props: { id?: string, name?: string }) {
         this.client.debug('getOrCreateStream %o', {
             props,
         })
@@ -174,8 +174,11 @@ export class StreamEndpoints {
                 const stream = await this.getStream(props.id)
                 return stream
             }
-            const stream = await this.getStreamByName(props.name!)
-            return stream
+
+            if (props.name) {
+                const stream = await this.getStreamByName(props.name)
+                return stream
+            }
         } catch (err: any) {
             if (err.errorCode !== ErrorCode.NOT_FOUND) {
                 throw err
@@ -191,9 +194,7 @@ export class StreamEndpoints {
         this.client.debug('getStreamPublishers %o', {
             streamId,
         })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'publishers')
-        const json = await authFetch<{ addresses: string[]}>(url, this.client.session)
-        return json.addresses.map((a: string) => a.toLowerCase())
+        return this.streamRegistryOnchain.getStreamPublishers(streamId)
     }
 
     async isStreamPublisher(streamId: string, ethAddress: EthereumAddress) {
@@ -201,26 +202,14 @@ export class StreamEndpoints {
             streamId,
             ethAddress,
         })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'publisher', ethAddress)
-        try {
-            await authFetch(url, this.client.session)
-            return true
-        } catch (e) {
-            this.client.debug(e)
-            if (e.response && e.response.status === 404) {
-                return false
-            }
-            throw e
-        }
+        return this.streamRegistryOnchain.isStreamPublisher(streamId, ethAddress)
     }
 
     async getStreamSubscribers(streamId: string) {
         this.client.debug('getStreamSubscribers %o', {
             streamId,
         })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'subscribers')
-        const json = await authFetch<{ addresses: string[] }>(url, this.client.session)
-        return json.addresses.map((a: string) => a.toLowerCase())
+        return this.streamRegistryOnchain.getStreamSubscribers(streamId)
     }
 
     async isStreamSubscriber(streamId: string, ethAddress: EthereumAddress) {
@@ -228,16 +217,7 @@ export class StreamEndpoints {
             streamId,
             ethAddress,
         })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'subscriber', ethAddress)
-        try {
-            await authFetch(url, this.client.session)
-            return true
-        } catch (e) {
-            if (e.response && e.response.status === 404) {
-                return false
-            }
-            throw e
-        }
+        return this.streamRegistryOnchain.isStreamSubscriber(streamId, ethAddress)
     }
 
     async getStreamValidationInfo(streamId: string) {
