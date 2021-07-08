@@ -11,7 +11,7 @@ import StreamRegistryArtifact from './StreamRegistryArtifact.json'
 // import { Provider } from '@ethersproject/abstract-provider'
 import fetch, { Response } from 'node-fetch'
 import { EthereumAddress } from '../../types'
-import { BigNumber } from 'ethers'
+import { BigNumber, ethers } from 'ethers'
 import { Errors } from 'streamr-client-protocol'
 import { StreamListQuery } from '../../rest/StreamEndpoints'
 import { NotFoundError } from '../../rest/authFetch'
@@ -65,6 +65,7 @@ export class StreamRegistryOnchain {
         }
         throw new NotFoundError('Stream: id=' + id)
     }
+
     async getAllStreams(): Promise<Array<Stream>> {
         // await this.connectToEthereum()
         log('getting all streams from thegraph')
@@ -350,11 +351,16 @@ export class StreamRegistryOnchain {
     }
     // Promise<StreamPermision[]
 
-    async getPermissionsForUser(streamId: string): Promise<StreamPermission> {
+    async getPermissionsForUser(streamId: string, userAddress: EthereumAddress): Promise<StreamPermission> {
         await this.connectToEthereum()
-        const userAddress: EthereumAddress = await this.ethereum.getAddress()
+        // const userAddress: EthereumAddress = await this.ethereum.getAddress()
         log('getting permission for stream for user')
-        const permissions = await this.streamRegistry?.getPermissionsForUser(streamId, userAddress)
+        let permissions
+        if (userAddress) {
+            permissions = await this.streamRegistry?.getPermissionsForUser(streamId, userAddress)
+        } else {
+            permissions = await this.streamRegistry?.getPermissionsForUser(streamId, ethers.constants.AddressZero)
+        }
         return {
             streamId,
             // operation: StreamOperation
@@ -415,42 +421,23 @@ export class StreamRegistryOnchain {
     }
 
     async grantPermission(streamId: string, operation: StreamOperation, recievingUser: string) {
-        // let properties = props || {}
         await this.connectToEthereum()
-        // const userAddress: string = (await this.ethereum.getAddress()).toLowerCase()
-        // log('creating/registering stream onchain')
-        // const a = this.ethereum.getAddress()
-        // const propsJsonStr : string = JSON.stringify(properties)
-        // let path = '/'
-        // if (properties.id && properties.id.includes('/')) {
-        //     path = properties.id.slice(properties.id.indexOf('/'), properties.id.length)
-        // }
-
-        // if (properties.id && !properties.id.startsWith('/') && !properties.id.startsWith(userAddress)) {
-        //     throw new ValidationError('Validation')
-        //     // TODO add check for ENS??
-        // }
-        // const path = properties.path || '/'
-        // const properties = this.streamRegistry.getStreamMetadata(id) as StreamProperties
-
-        // console.log('#### ' + path + ' ' + propsJsonStr)
-        // console.log('####### creating stream with path ' + path)
         const tx = await this.streamRegistry?.grantPermission(streamId, recievingUser,
             StreamRegistryOnchain.streamOperationToSolidityType(operation))
-        const tx2 = await tx?.wait()
-        console.log(tx2)
+        await tx?.wait()
+    }
 
-        // const id = userAddress + path
-        // properties = {
-        //     ...properties,
-        //     id
-        // }
-        // console.log('txreceipt' + JSON.stringify(txreceipt))
-        // // TODO check for success
-        // console.log('#### id ' + id)
-        // const metaDateFromChain = await this.streamRegistry.getStreamMetadata(id)
-        // console.log('#### ' + JSON.stringify(metaDateFromChain))
-        // return new Stream(this.client, properties)
+    async revokePermission(streamId: string, operation: StreamOperation, recievingUser: string) {
+        await this.connectToEthereum()
+        const tx = await this.streamRegistry?.revokePermission(streamId, recievingUser,
+            StreamRegistryOnchain.streamOperationToSolidityType(operation))
+        await tx?.wait()
+    }
+
+    async deleteStream(streamId: string) {
+        await this.connectToEthereum()
+        const tx = await this.streamRegistry?.deleteStream(streamId)
+        await tx?.wait()
     }
 
     static streamOperationToSolidityType(operation: StreamOperation): BigNumber {
@@ -459,9 +446,9 @@ export class StreamRegistryOnchain {
                 return BigNumber.from(0)
             case StreamOperation.STREAM_DELETE:
                 return BigNumber.from(1)
-            case StreamOperation.STREAM_SUBSCRIBE:
-                return BigNumber.from(2)
             case StreamOperation.STREAM_PUBLISH:
+                return BigNumber.from(2)
+            case StreamOperation.STREAM_SUBSCRIBE:
                 return BigNumber.from(3)
             case StreamOperation.STREAM_SHARE:
                 return BigNumber.from(4)

@@ -144,13 +144,14 @@ export class Stream {
     }
 
     async delete() {
-        await authFetch(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id),
-            this._client.session,
-            {
-                method: 'DELETE',
-            },
-        )
+        // await authFetch(
+        //     getEndpointUrl(this._client.options.restUrl, 'streams', this.id),
+        //     this._client.session,
+        //     {
+        //         method: 'DELETE',
+        //     },
+        // )
+        await this._client.streamRegistryOnchain.deleteStream(this.id)
     }
 
     async getPermissions() {
@@ -173,8 +174,11 @@ export class Stream {
         // eth addresses may be in checksumcase, but userId from server has no case
 
         // const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined // if not string then undefined
-        const permissions = await this.getMyPermissions()
+        const permissions = await this._client.streamRegistryOnchain.getPermissionsForUser(this.id, userId)
 
+        if (operation === StreamOperation.STREAM_PUBLISH || operation === StreamOperation.STREAM_SUBSCRIBE) {
+            return permissions[operation].gt(Date.now())
+        }
         return permissions[operation]
         // return permissions.find((p: any) => {
         //     if (p.operation !== operation) { return false }
@@ -187,37 +191,13 @@ export class Stream {
     }
 
     async grantPermission(operation: StreamOperation, userId: string|undefined) {
-        // const permissionObject: any = {
-        //     operation,
-        // }
-
         const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : ethers.constants.AddressZero
-
-        // if (userIdCaseInsensitive !== undefined) {
-        //     permissionObject.user = userIdCaseInsensitive
-        // } else {
-        //     permissionObject.user = '0x0'
-        // }
-
-        this._client.streamRegistryOnchain.grantPermission(this.id, operation, userIdCaseInsensitive)
-        // return authFetch<StreamPermission>(
-        //     getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions'),
-        //     this._client.session,
-        //     {
-        //         method: 'POST',
-        //         body: JSON.stringify(permissionObject),
-        //     },
-        // )
+        await this._client.streamRegistryOnchain.grantPermission(this.id, operation, userIdCaseInsensitive)
     }
 
-    async revokePermission(permissionId: number) {
-        await authFetch(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions', String(permissionId)),
-            this._client.session,
-            {
-                method: 'DELETE',
-            },
-        )
+    async revokePermission(operation: StreamOperation, userId: string|undefined) {
+        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : ethers.constants.AddressZero
+        await this._client.streamRegistryOnchain.revokePermission(this.id, operation, userIdCaseInsensitive)
     }
 
     async detectFields() {
