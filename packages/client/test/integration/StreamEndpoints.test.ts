@@ -258,7 +258,6 @@ function TestStreamEndpoints(getName: () => string) {
     describe('Stream permissions', () => {
         it('Stream.getPermissions', async () => {
             const permissions = await createdStream.getPermissions()
-            // get, edit, delete, subscribe, publish, share
             expect(permissions.length).toBe(1)
         })
 
@@ -287,33 +286,33 @@ function TestStreamEndpoints(getName: () => string) {
         })
     })
 
-    // describe('Storage node assignment', () => {
-    //     it('add', async () => {
-    //         const storageNode = StorageNode.STREAMR_DOCKER_DEV
-    //         const stream = await client.createStream()
-    //         await stream.addToStorageNode(storageNode)
-    //         const storageNodes = await stream.getStorageNodes()
-    //         expect(storageNodes.length).toBe(1)
-    //         expect(storageNodes[0].getAddress()).toBe(storageNode.getAddress())
-    //         const storedStreamParts = await client.getStreamPartsByStorageNode(storageNode)
-    //         expect(storedStreamParts.some(
-    //             (sp) => (sp.getStreamId() === stream.id) && (sp.getStreamPartition() === 0)
-    //         )).toBeTruthy()
-    //     })
+    describe('Storage node assignment', () => {
+        it('add', async () => {
+            const storageNode = StorageNode.STREAMR_DOCKER_DEV
+            const stream = await client.createStream()
+            await stream.addToStorageNode(storageNode)
+            const storageNodes = await stream.getStorageNodes()
+            expect(storageNodes.length).toBe(1)
+            expect(storageNodes[0].getAddress()).toBe(storageNode.getAddress())
+            const storedStreamParts = await client.getStreamPartsByStorageNode(storageNode)
+            expect(storedStreamParts.some(
+                (sp) => (sp.getStreamId() === stream.id) && (sp.getStreamPartition() === 0)
+            )).toBeTruthy()
+        })
 
-    //     it('remove', async () => {
-    //         const storageNode = StorageNode.STREAMR_DOCKER_DEV
-    //         const stream = await client.createStream()
-    //         await stream.addToStorageNode(storageNode)
-    //         await stream.removeFromStorageNode(storageNode)
-    //         const storageNodes = await stream.getStorageNodes()
-    //         expect(storageNodes).toHaveLength(0)
-    //         const storedStreamParts = await client.getStreamPartsByStorageNode(storageNode)
-    //         expect(storedStreamParts.some(
-    //             (sp) => (sp.getStreamId() === stream.id)
-    //         )).toBeFalsy()
-    //     })
-    // })
+        it('remove', async () => {
+            const storageNode = StorageNode.STREAMR_DOCKER_DEV
+            const stream = await client.createStream()
+            await stream.addToStorageNode(storageNode)
+            await stream.removeFromStorageNode(storageNode)
+            const storageNodes = await stream.getStorageNodes()
+            expect(storageNodes).toHaveLength(0)
+            const storedStreamParts = await client.getStreamPartsByStorageNode(storageNode)
+            expect(storedStreamParts.some(
+                (sp) => (sp.getStreamId() === stream.id)
+            )).toBeFalsy()
+        })
+    })
 }
 
 describe('StreamEndpoints', () => {
@@ -321,7 +320,7 @@ describe('StreamEndpoints', () => {
         TestStreamEndpoints(() => uid('test-stream'))
     })
 
-    // describe('using name with slashes', () => {
-    //     TestStreamEndpoints(() => uid('test-stream/slashes'))
-    // })
+    describe('using name with slashes', () => {
+        TestStreamEndpoints(() => uid('test-stream/slashes'))
+    })
 })

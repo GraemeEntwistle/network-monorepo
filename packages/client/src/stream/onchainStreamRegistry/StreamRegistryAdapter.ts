@@ -22,7 +22,7 @@ const { ValidationError } = Errors
 const log = debug('StreamrClient::StreamRegistryOnchain')
 
 // export interface StreamRegistryOnchain {}
-export class StreamRegistryOnchain {
+export class StreamRegistryAdapter {
     client: StreamrClient
     ethereum: StreamrEthereum
     // streamRegistryAddress: EthereumAddress
@@ -34,14 +34,6 @@ export class StreamRegistryOnchain {
         log('creating StreamRegistryOnchain')
         this.client = client
         this.ethereum = client.ethereum
-        // this.streamRegistryAddress = client.options.streamRegistrySidechainAddress
-        // this.ensCacheSidechainAddress = client.options.ensCacheSidechainAddress
-        // this.sideChainPrivider = this.ethereum.getSidechainSigner() as Signer
-        // console.log('######### regaddr' + client.options.streamRegistrySidechainAddress)
-
-        // this.streamRegistry = new Contract(client.options.streamRegistrySidechainAddress,
-        //     StreamRegistryArtifact.abi, this.sideChainPrivider) as StreamRegistry
-        // console.log('######### contractaddr ' + this.streamRegistry.address)
     }
 
     async connectToEthereum() {
@@ -59,7 +51,7 @@ export class StreamRegistryOnchain {
         // console.log(id)
         try {
             const propertiesString = await this.streamRegistry?.getStreamMetadata(id) || '{}'
-            return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(id, propertiesString))
+            return new Stream(this.client, StreamRegistryAdapter.parseStreamProps(id, propertiesString))
         } catch (error) {
             log(error)
         }
@@ -71,7 +63,7 @@ export class StreamRegistryOnchain {
         log('getting all streams from thegraph')
         // const a = this.ethereum.getAddress()
         // console.log(id);
-        const query: string = StreamRegistryOnchain.buildGetStreamGQLQuery()
+        const query: string = StreamRegistryAdapter.buildGetStreamGQLQuery()
         // console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
@@ -80,7 +72,7 @@ export class StreamRegistryOnchain {
         }
         // console.log(JSON.stringify(resJson))
         return resJson.data.streams.map((streamobj: any) => {
-            return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata))
+            return new Stream(this.client, StreamRegistryAdapter.parseStreamProps(streamobj.id, streamobj.metadata))
         })
 
     }
@@ -88,7 +80,7 @@ export class StreamRegistryOnchain {
         // await this.connectToEthereum()
         // const a = this.ethereum.getAddress()
         // console.log(id);
-        const query: string = StreamRegistryOnchain.buildGetSingleStreamQuery(streamid)
+        const query: string = StreamRegistryAdapter.buildGetSingleStreamQuery(streamid)
         // console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
@@ -106,7 +98,7 @@ export class StreamRegistryOnchain {
 
     async getFilteredStreamList(filter: StreamListQuery): Promise<Stream[]> {
 
-        const gqlquery: string = StreamRegistryOnchain.buildGetFilteredStreamListQuery(filter.name)
+        const gqlquery: string = StreamRegistryAdapter.buildGetFilteredStreamListQuery(filter.name)
         // console.log('######' + query)
         const res = await this.queryTheGraph(gqlquery)
         const resJson = await res.json()
@@ -122,7 +114,7 @@ export class StreamRegistryOnchain {
                 delete permission.id
                 return permission
             })
-            streams.push(new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata)))
+            streams.push(new Stream(this.client, StreamRegistryAdapter.parseStreamProps(streamobj.id, streamobj.metadata)))
         })
         return streams
     }
@@ -138,44 +130,8 @@ export class StreamRegistryOnchain {
             body: query
         })
     }
-    // .. use querybuilder? i.e. https://www.npmjs.com/package/gql-query-builder
-    // .. how to get permissions filtered on "they belong to the same stream"?
-    // alternative: get stream with all its permission:
-
-    // {
-    //     streams (  where: {
-    //    id: "0x4178babe9e5148c6d5fd431cd72884b07ad855a0/auxigkli"}) {
-    //      id,
-    //      metadata,
-    //      permissions {
-    //        id,
-    //            user,
-    //            edit,
-    //        canDelete,
-    //        publish,
-    //        subscribed,
-    //        share,
-    //      }
-    //    }
-    //  }
 
     static buildGetPermissionGQLQuery(streamid: string): string {
-        //    id: "0x4178babe9e5148c6d5fd431cd72884b07ad855a0/"}) {
-        // const queryWithVars = gql.query({
-        //     operation: 'stream',
-        //     fields: ['id', 'metadata', {
-        //         permissions: ['id',
-        //             'userAddress',
-        //             'edit',
-        //             'canDelete',
-        //             'publishExpiration',
-        //             'subscribeExpiration',
-        //             'share'
-        //         ]
-        //     }],
-        //     variables: { id: streamid },
-        // })
-
         const query = `{
             stream (  where: {
               id: "${streamid}"}) {
@@ -330,11 +286,6 @@ export class StreamRegistryOnchain {
             throw new ValidationError('Validation')
             // TODO add check for ENS??
         }
-        // const path = properties.path || '/'
-        // const properties = this.streamRegistry.getStreamMetadata(id) as StreamProperties
-
-        // console.log('#### ' + path + ' ' + propsJsonStr)
-        // console.log('####### creating stream with path ' + path)
         const tx = await this.streamRegistry?.createStream(path, propsJsonStr)
         await tx?.wait()
         const id = userAddress + path
@@ -342,11 +293,31 @@ export class StreamRegistryOnchain {
             ...properties,
             id
         }
-        // console.log('txreceipt' + JSON.stringify(txreceipt))
-        // // TODO check for success
-        // console.log('#### id ' + id)
-        // const metaDateFromChain = await this.streamRegistry.getStreamMetadata(id)
-        // console.log('#### ' + JSON.stringify(metaDateFromChain))
+        return new Stream(this.client, properties)
+    }
+    async updateStream(props?: StreamProperties): Promise<Stream> {
+        let properties = props || {}
+        await this.connectToEthereum()
+        const userAddress: string = (await this.ethereum.getAddress()).toLowerCase()
+        log('creating/registering stream onchain')
+        // const a = this.ethereum.getAddress()
+        const propsJsonStr : string = JSON.stringify(properties)
+        let path = '/'
+        if (properties.id && properties.id.includes('/')) {
+            path = properties.id.slice(properties.id.indexOf('/'), properties.id.length)
+        }
+
+        if (properties.id && !properties.id.startsWith('/') && !properties.id.startsWith(userAddress)) {
+            throw new ValidationError('Validation')
+            // TODO add check for ENS??
+        }
+        const id = userAddress + path
+        const tx = await this.streamRegistry?.updateStreamMetadata(id, propsJsonStr)
+        await tx?.wait()
+        properties = {
+            ...properties,
+            id
+        }
         return new Stream(this.client, properties)
     }
     // Promise<StreamPermision[]
@@ -374,7 +345,7 @@ export class StreamRegistryOnchain {
     }
 
     async getStreamPublishers(streamId: string): Promise<EthereumAddress[]> {
-        const query: string = StreamRegistryOnchain.buildGetStreamPublishersQuery(streamId)
+        const query: string = StreamRegistryAdapter.buildGetStreamPublishersQuery(streamId)
         // console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
@@ -387,7 +358,7 @@ export class StreamRegistryOnchain {
     }
 
     async isStreamPublisher(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
-        const query: string = StreamRegistryOnchain.buildIsPublisherQuery(streamId, userAddress)
+        const query: string = StreamRegistryAdapter.buildIsPublisherQuery(streamId, userAddress)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
         try {
@@ -397,7 +368,7 @@ export class StreamRegistryOnchain {
         }
     }
     async getStreamSubscribers(streamId: string): Promise<EthereumAddress[]> {
-        const query: string = StreamRegistryOnchain.buildGetStreamSubscribersQuery(streamId)
+        const query: string = StreamRegistryAdapter.buildGetStreamSubscribersQuery(streamId)
         // console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
@@ -410,7 +381,7 @@ export class StreamRegistryOnchain {
     }
 
     async isStreamSubscriber(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
-        const query: string = StreamRegistryOnchain.buildIsSubscriberQuery(streamId, userAddress)
+        const query: string = StreamRegistryAdapter.buildIsSubscriberQuery(streamId, userAddress)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
         try {
@@ -423,14 +394,14 @@ export class StreamRegistryOnchain {
     async grantPermission(streamId: string, operation: StreamOperation, recievingUser: string) {
         await this.connectToEthereum()
         const tx = await this.streamRegistry?.grantPermission(streamId, recievingUser,
-            StreamRegistryOnchain.streamOperationToSolidityType(operation))
+            StreamRegistryAdapter.streamOperationToSolidityType(operation))
         await tx?.wait()
     }
 
     async revokePermission(streamId: string, operation: StreamOperation, recievingUser: string) {
         await this.connectToEthereum()
         const tx = await this.streamRegistry?.revokePermission(streamId, recievingUser,
-            StreamRegistryOnchain.streamOperationToSolidityType(operation))
+            StreamRegistryAdapter.streamOperationToSolidityType(operation))
         await tx?.wait()
     }
 

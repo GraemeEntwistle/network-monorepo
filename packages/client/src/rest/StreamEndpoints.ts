@@ -13,7 +13,7 @@ import { StreamPart } from '../stream/StreamPart'
 import authFetch, { ErrorCode, NotFoundError } from './authFetch'
 import { EthereumAddress } from '../types'
 import { StreamrClient } from '../StreamrClient'
-import { StreamRegistryOnchain } from '../stream/onchainStreamRegistry/StreamRegistryAdapter'
+import { StreamRegistryAdapter } from '../stream/onchainStreamRegistry/StreamRegistryAdapter'
 // TODO change this import when streamr-client-protocol exports StreamMessage type or the enums types directly
 import { ContentType, EncryptionType, SignatureType, StreamMessageType } from 'streamr-client-protocol/dist/src/protocol/message_layer/StreamMessage'
 import { StorageNode } from '../stream/StorageNode'
@@ -83,11 +83,11 @@ export class StreamEndpoints {
 
     /** @internal */
     client: StreamrClient
-    streamRegistryOnchain: StreamRegistryOnchain
+    streamRegistryAdapter: StreamRegistryAdapter
 
     constructor(client: StreamrClient) {
         this.client = client
-        this.streamRegistryOnchain = new StreamRegistryOnchain(client)
+        this.streamRegistryAdapter = new StreamRegistryAdapter(client)
     }
 
     /**
@@ -108,7 +108,7 @@ export class StreamEndpoints {
         // const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId)
         // const json = await authFetch<StreamProperties>(url, this.client.session)
         // return new Stream(this.client, json)
-        return this.streamRegistryOnchain.getStreamById(streamId)
+        return this.streamRegistryAdapter.getStreamById(streamId)
     }
 
     /**
@@ -121,7 +121,7 @@ export class StreamEndpoints {
         // const url = getEndpointUrl(this.client.options.restUrl, 'streams') + '?' + qs.stringify(query)
         // const json = await authFetch<StreamProperties[]>(url, this.client.session)
         // return json ? json.map((stream: StreamProperties) => new Stream(this.client, stream)) : []
-        return this.streamRegistryOnchain.getFilteredStreamList(query)
+        return this.streamRegistryAdapter.getFilteredStreamList(query)
     }
 
     async getStreamByName(name: string) {
@@ -157,7 +157,7 @@ export class StreamEndpoints {
         //         body: JSON.stringify(body),
         //     },
         // )
-        return this.streamRegistryOnchain.createStream(props)
+        return this.streamRegistryAdapter.createStream(props)
         // return new Stream(this.client, json)
     }
 
@@ -194,7 +194,7 @@ export class StreamEndpoints {
         this.client.debug('getStreamPublishers %o', {
             streamId,
         })
-        return this.streamRegistryOnchain.getStreamPublishers(streamId)
+        return this.streamRegistryAdapter.getStreamPublishers(streamId)
     }
 
     async isStreamPublisher(streamId: string, ethAddress: EthereumAddress) {
@@ -202,14 +202,14 @@ export class StreamEndpoints {
             streamId,
             ethAddress,
         })
-        return this.streamRegistryOnchain.isStreamPublisher(streamId, ethAddress)
+        return this.streamRegistryAdapter.isStreamPublisher(streamId, ethAddress)
     }
 
     async getStreamSubscribers(streamId: string) {
         this.client.debug('getStreamSubscribers %o', {
             streamId,
         })
-        return this.streamRegistryOnchain.getStreamSubscribers(streamId)
+        return this.streamRegistryAdapter.getStreamSubscribers(streamId)
     }
 
     async isStreamSubscriber(streamId: string, ethAddress: EthereumAddress) {
@@ -217,7 +217,7 @@ export class StreamEndpoints {
             streamId,
             ethAddress,
         })
-        return this.streamRegistryOnchain.isStreamSubscriber(streamId, ethAddress)
+        return this.streamRegistryAdapter.isStreamSubscriber(streamId, ethAddress)
     }
 
     async getStreamValidationInfo(streamId: string) {

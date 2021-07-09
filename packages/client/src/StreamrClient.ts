@@ -22,7 +22,7 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { getAddress } from '@ethersproject/address'
 import { Contract } from '@ethersproject/contracts'
 import { StreamPartDefinition, GroupKey } from './stream'
-import { StreamRegistryOnchain } from './stream/onchainStreamRegistry/StreamRegistryAdapter'
+import { StreamRegistryAdapter } from './stream/onchainStreamRegistry/StreamRegistryAdapter'
 
 // TODO get metadata type from streamr-protocol-js project (it doesn't export the type definitions yet)
 export type OnMessageCallback = MaybeAsync<(message: any, metadata: any) => void>
@@ -180,7 +180,7 @@ export class StreamrClient extends EventEmitter { // eslint-disable-line no-rede
     /** @internal */
     ethereum: StreamrEthereum
     /** @internal */
-    streamRegistryOnchain: StreamRegistryOnchain
+    streamRegistryAdapter: StreamRegistryAdapter
 
     // TODO annotate connection parameter as internal parameter if possible?
     constructor(options: StreamrClientOptions = {}, connection?: StreamrConnection) {
@@ -222,7 +222,7 @@ export class StreamrClient extends EventEmitter { // eslint-disable-line no-rede
         // Plugin(this, new LoginEndpoints(this))
         this.cached = new StreamrCached(this)
 
-        this.streamRegistryOnchain = new StreamRegistryOnchain(this)
+        this.streamRegistryAdapter = new StreamRegistryAdapter(this)
     }
 
     /** @internal */
