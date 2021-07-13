@@ -2,7 +2,6 @@ import { ethers, Wallet } from 'ethers'
 // import { NotFoundError, ValidationError } from '../../src/rest/authFetch'
 import { Stream, StreamOperation, StreamProperties } from '../../src/stream'
 import { StorageNode } from '../../src/stream/StorageNode'
-
 import { StreamrClient } from '../../src/StreamrClient'
 import { uid, fakeAddress } from '../utils'
 
@@ -17,7 +16,7 @@ let counter = 0
 const getNewProps = () : StreamProperties => {
     counter += 1
     return {
-        id: '/path-' + Date.now() + '-' + counter
+        id: '/path-' + counter
     }
 }
 

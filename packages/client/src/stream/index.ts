@@ -8,7 +8,9 @@ export { GroupKey } from './encryption/Encryption'
 import { StorageNode } from './StorageNode'
 import { StreamrClient } from '../StreamrClient'
 import { EthereumAddress } from '../types'
-import { BigNumber, ethers } from 'ethers'
+import { AddressZero } from '@ethersproject/constants'
+import { BigNumber } from '@ethersproject/bignumber'
+// import { BigNumber, ethers } from 'ethers'
 
 // TODO explicit types: e.g. we never provide both streamId and id, or both streamPartition and partition
 export type StreamPartDefinitionOptions = { streamId?: string, streamPartition?: number, id?: string, partition?: number, stream?: Stream|string }
@@ -98,7 +100,7 @@ export class Stream {
     }
 
     async update() {
-        this._client.streamRegistryAdapter.updateStream(this.toObject())
+        this._client.updateStream(this.toObject())
     }
 
     /** @internal */
@@ -114,22 +116,22 @@ export class Stream {
     }
 
     async delete() {
-        await this._client.streamRegistryAdapter.deleteStream(this.id)
+        await this._client.deleteStream(this.id)
     }
 
     async getPermissions() {
-        return this._client.streamRegistryAdapter.getAllPermissionsForStream(this.id)
+        return this._client.getAllPermissionsForStream(this.id)
     }
 
     async getMyPermissions() {
-        return this._client.streamRegistryAdapter.getPermissionsForUser(this.id, await this._client.getAddress())
+        return this._client.getPermissionsForUser(this.id, await this._client.getAddress())
     }
 
     async hasPermission(operation: StreamOperation, userId: string) {
         // eth addresses may be in checksumcase, but userId from server has no case
 
         // const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined // if not string then undefined
-        const permissions = await this._client.streamRegistryAdapter.getPermissionsForUser(this.id, userId)
+        const permissions = await this._client.getPermissionsForUser(this.id, userId)
 
         if (operation === StreamOperation.STREAM_PUBLISH || operation === StreamOperation.STREAM_SUBSCRIBE) {
             return permissions[operation].gt(Date.now())
@@ -138,13 +140,13 @@ export class Stream {
     }
 
     async grantPermission(operation: StreamOperation, userId: string|undefined) {
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : ethers.constants.AddressZero
-        await this._client.streamRegistryAdapter.grantPermission(this.id, operation, userIdCaseInsensitive)
+        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : AddressZero
+        await this._client.grantPermission(this.id, operation, userIdCaseInsensitive)
     }
 
     async revokePermission(operation: StreamOperation, userId: string|undefined) {
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : ethers.constants.AddressZero
-        await this._client.streamRegistryAdapter.revokePermission(this.id, operation, userIdCaseInsensitive)
+        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : AddressZero
+        await this._client.revokePermission(this.id, operation, userIdCaseInsensitive)
     }
 
     async detectFields() {

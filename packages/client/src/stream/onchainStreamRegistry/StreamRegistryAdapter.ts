@@ -11,10 +11,12 @@ import StreamRegistryArtifact from './StreamRegistryArtifact.json'
 // import { Provider } from '@ethersproject/abstract-provider'
 import fetch, { Response } from 'node-fetch'
 import { EthereumAddress } from '../../types'
-import { BigNumber, ethers } from 'ethers'
+// import { BigNumber, ethers } from 'ethers'
 import { Errors } from 'streamr-client-protocol'
 import { StreamListQuery } from '../../rest/StreamEndpoints'
 import { NotFoundError } from '../../rest/authFetch'
+import { AddressZero } from '@ethersproject/constants'
+import { BigNumber } from '@ethersproject/bignumber'
 
 const { ValidationError } = Errors
 
@@ -44,11 +46,11 @@ export class StreamRegistryAdapter {
         }
     }
 
-    async getStreamById(id: string): Promise<Stream> {
+    async getStream(id: string): Promise<Stream> {
         await this.connectToEthereum()
-        log('getting stream(properties) by id from chain')
-        // const a = this.ethereum.getAddress()
-        // console.log(id)
+        this.client.debug('getStream %o', {
+            id,
+        })
         try {
             const propertiesString = await this.streamRegistry?.getStreamMetadata(id) || '{}'
             return new Stream(this.client, StreamRegistryAdapter.parseStreamProps(id, propertiesString))
@@ -96,7 +98,7 @@ export class StreamRegistryAdapter {
         })
     }
 
-    async getFilteredStreamList(filter: StreamListQuery): Promise<Stream[]> {
+    async listStreams(filter: StreamListQuery): Promise<Stream[]> {
 
         const gqlquery: string = StreamRegistryAdapter.buildGetFilteredStreamListQuery(filter.name)
         // console.log('######' + query)
@@ -264,17 +266,19 @@ export class StreamRegistryAdapter {
                 // path: id.substring(id.indexOf('/'))
             }
         } catch (error) {
-            // throw new Error(`could not parse prperties from onachein metadata: ${propsString}`)
-            return { id, description: 'ERROR IN PROPS' }
+            throw new Error(`could not parse prperties from onachein metadata: ${propsString}`)
+            // return { id, description: 'ERROR IN PROPS' }
         }
         return parsedProps
     }
 
     async createStream(props?: StreamProperties): Promise<Stream> {
+        this.client.debug('createStream %o', {
+            props,
+        })
         let properties = props || {}
         await this.connectToEthereum()
         const userAddress: string = (await this.ethereum.getAddress()).toLowerCase()
-        log('creating/registering stream onchain')
         // const a = this.ethereum.getAddress()
         const propsJsonStr : string = JSON.stringify(properties)
         let path = '/'
@@ -330,7 +334,7 @@ export class StreamRegistryAdapter {
         if (userAddress) {
             permissions = await this.streamRegistry?.getPermissionsForUser(streamId, userAddress)
         } else {
-            permissions = await this.streamRegistry?.getPermissionsForUser(streamId, ethers.constants.AddressZero)
+            permissions = await this.streamRegistry?.getPermissionsForUser(streamId, AddressZero)
         }
         return {
             streamId,
@@ -345,6 +349,9 @@ export class StreamRegistryAdapter {
     }
 
     async getStreamPublishers(streamId: string): Promise<EthereumAddress[]> {
+        this.client.debug('getStreamPublishers %o', {
+            streamId,
+        })
         const query: string = StreamRegistryAdapter.buildGetStreamPublishersQuery(streamId)
         // console.log('######' + query)
         const res = await this.queryTheGraph(query)
@@ -358,6 +365,10 @@ export class StreamRegistryAdapter {
     }
 
     async isStreamPublisher(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
+        this.client.debug('isStreamPublisher %o', {
+            streamId,
+            userAddress,
+        })
         const query: string = StreamRegistryAdapter.buildIsPublisherQuery(streamId, userAddress)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
@@ -368,6 +379,9 @@ export class StreamRegistryAdapter {
         }
     }
     async getStreamSubscribers(streamId: string): Promise<EthereumAddress[]> {
+        this.client.debug('getStreamSubscribers %o', {
+            streamId,
+        })
         const query: string = StreamRegistryAdapter.buildGetStreamSubscribersQuery(streamId)
         // console.log('######' + query)
         const res = await this.queryTheGraph(query)
@@ -381,6 +395,10 @@ export class StreamRegistryAdapter {
     }
 
     async isStreamSubscriber(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
+        this.client.debug('isStreamSubscriber %o', {
+            streamId,
+            userAddress,
+        })
         const query: string = StreamRegistryAdapter.buildIsSubscriberQuery(streamId, userAddress)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()

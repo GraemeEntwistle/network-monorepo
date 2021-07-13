@@ -83,82 +83,23 @@ export class StreamEndpoints {
 
     /** @internal */
     client: StreamrClient
-    streamRegistryAdapter: StreamRegistryAdapter
+    // streamRegistryAdapter: StreamRegistryAdapter
 
     constructor(client: StreamrClient) {
         this.client = client
-        this.streamRegistryAdapter = new StreamRegistryAdapter(client)
-    }
-
-    /**
-     * @category Important
-     */
-    async getStream(streamId: string) {
-        this.client.debug('getStream %o', {
-            streamId,
-        })
-
-        // if (isKeyExchangeStream(streamId)) {
-        //     return new Stream(this.client, {
-        //         id: streamId,
-        //         partitions: 1,
-        //     })
-        // }
-
-        // const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId)
-        // const json = await authFetch<StreamProperties>(url, this.client.session)
-        // return new Stream(this.client, json)
-        return this.streamRegistryAdapter.getStreamById(streamId)
-    }
-
-    /**
-     * @category Important
-     */
-    async listStreams(query: StreamListQuery = {}): Promise<Stream[]> {
-        // this.client.debug('listStreams %o', {
-        //     query,
-        // })
-        // const url = getEndpointUrl(this.client.options.restUrl, 'streams') + '?' + qs.stringify(query)
-        // const json = await authFetch<StreamProperties[]>(url, this.client.session)
-        // return json ? json.map((stream: StreamProperties) => new Stream(this.client, stream)) : []
-        return this.streamRegistryAdapter.getFilteredStreamList(query)
+        // this.streamRegistryAdapter = client.streamRegistryAdapter
     }
 
     async getStreamByName(name: string) {
         this.client.debug('getStreamByName %o', {
             name,
         })
-        const json = await this.listStreams({
+        const json = await this.client.listStreams({
             name,
             // @ts-expect-error
             public: false,
         })
         return json[0] ? new Stream(this.client, json[0]) : Promise.reject(new NotFoundError('Stream: name=' + name))
-    }
-
-    /**
-     * @category Important
-     * @param props - if id is specified, it can be full streamId or path
-     */
-    async createStream(props?: StreamProperties): Promise<Stream> {
-        this.client.debug('createStream %o', {
-            props,
-        })
-        // const propsFilled = new StreamProperties(props)
-        // const body = (props?.id !== undefined) ? {
-        //     ...props,
-        //     id: await createStreamId(props.id, () => this.client.getAddress())
-        // } : props
-        // const json = await authFetch<StreamProperties>(
-        //     getEndpointUrl(this.client.options.restUrl, 'streams'),
-        //     this.client.session,
-        //     {
-        //         method: 'POST',
-        //         body: JSON.stringify(body),
-        //     },
-        // )
-        return this.streamRegistryAdapter.createStream(props)
-        // return new Stream(this.client, json)
     }
 
     /**
@@ -171,7 +112,7 @@ export class StreamEndpoints {
         // Try looking up the stream by id or name, whichever is defined
         try {
             if (props.id) {
-                const stream = await this.getStream(props.id)
+                const stream = await this.client.getStream(props.id)
                 return stream
             }
 
@@ -185,39 +126,9 @@ export class StreamEndpoints {
             }
         }
 
-        const stream = await this.createStream(props)
+        const stream = await this.client.createStream(props)
         debug('Created stream: %s (%s)', props.name, stream.id)
         return stream
-    }
-
-    async getStreamPublishers(streamId: string) {
-        this.client.debug('getStreamPublishers %o', {
-            streamId,
-        })
-        return this.streamRegistryAdapter.getStreamPublishers(streamId)
-    }
-
-    async isStreamPublisher(streamId: string, ethAddress: EthereumAddress) {
-        this.client.debug('isStreamPublisher %o', {
-            streamId,
-            ethAddress,
-        })
-        return this.streamRegistryAdapter.isStreamPublisher(streamId, ethAddress)
-    }
-
-    async getStreamSubscribers(streamId: string) {
-        this.client.debug('getStreamSubscribers %o', {
-            streamId,
-        })
-        return this.streamRegistryAdapter.getStreamSubscribers(streamId)
-    }
-
-    async isStreamSubscriber(streamId: string, ethAddress: EthereumAddress) {
-        this.client.debug('isStreamSubscriber %o', {
-            streamId,
-            ethAddress,
-        })
-        return this.streamRegistryAdapter.isStreamSubscriber(streamId, ethAddress)
     }
 
     async getStreamValidationInfo(streamId: string) {

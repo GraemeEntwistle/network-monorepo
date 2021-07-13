@@ -17,6 +17,7 @@ import { Subscriber, Subscription } from './subscribe'
 import { getUserId } from './user'
 import { Todo, MaybeAsync, EthereumAddress } from './types'
 import { StreamEndpoints } from './rest/StreamEndpoints'
+import { LoginEndpoints } from './rest/LoginEndpoints'
 import { DataUnion, DataUnionDeployOptions } from './dataunion/DataUnion'
 import { BigNumber } from '@ethersproject/bignumber'
 import { getAddress } from '@ethersproject/address'
@@ -90,6 +91,7 @@ class StreamrCached {
     client: StreamrClient
     // TODO change all "any" types in this class to valid types when CacheAsyncFn is converted to TypeScript
     getStream: any
+    getUserInfo: any
     isStreamPublisher: any
     isStreamSubscriber: any
     getUserId: any
@@ -104,6 +106,7 @@ class StreamrCached {
                 return streamId
             }
         })
+        this.getUserInfo = CacheAsyncFn(client.getUserInfo.bind(client), cacheOptions)
         this.isStreamPublisher = CacheAsyncFn(client.isStreamPublisher.bind(client), {
             ...cacheOptions,
             cacheKey([maybeStreamId, ethAddress]: any) {
@@ -130,6 +133,7 @@ class StreamrCached {
     }
 
     clearUser() {
+        this.getUserInfo.clear()
         this.getUserId.clear()
     }
 
@@ -157,7 +161,7 @@ function Plugin(targetInstance: any, srcInstance: any) {
 }
 
 // these are mixed in via Plugin function above
-export interface StreamrClient extends StreamEndpoints, Publisher, Subscriber {}
+export interface StreamrClient extends StreamEndpoints, LoginEndpoints, StreamRegistryAdapter, Publisher, Subscriber {}
 
 /**
  * @category Important
@@ -179,8 +183,6 @@ export class StreamrClient extends EventEmitter { // eslint-disable-line no-rede
     cached: StreamrCached
     /** @internal */
     ethereum: StreamrEthereum
-    /** @internal */
-    streamRegistryAdapter: StreamRegistryAdapter
 
     // TODO annotate connection parameter as internal parameter if possible?
     constructor(options: StreamrClientOptions = {}, connection?: StreamrConnection) {
@@ -219,10 +221,9 @@ export class StreamrClient extends EventEmitter { // eslint-disable-line no-rede
         this.subscriber = new Subscriber(this)
 
         Plugin(this, new StreamEndpoints(this))
-        // Plugin(this, new LoginEndpoints(this))
+        Plugin(this, new LoginEndpoints(this))
+        Plugin(this, new StreamRegistryAdapter(this))
         this.cached = new StreamrCached(this)
-
-        this.streamRegistryAdapter = new StreamRegistryAdapter(this)
     }
 
     /** @internal */
@@ -291,10 +292,9 @@ export class StreamrClient extends EventEmitter { // eslint-disable-line no-rede
     /**
      * @category Important
      */
-    // async connect() {
-    //     // return this.connection.connect()
-    //     const a = this.ethereum
-    // }
+    async connect() {
+        return this.connection.connect()
+    }
 
     async nextConnection() {
         return this.connection.nextConnection()
