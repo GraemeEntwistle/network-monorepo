@@ -127,7 +127,7 @@ export class Stream {
         return this._client.getPermissionsForUser(this.id, await this._client.getAddress())
     }
 
-    async hasPermission(operation: StreamOperation, userId: string) {
+    async hasPermission(operation: StreamOperation, userId: EthereumAddress) {
         // eth addresses may be in checksumcase, but userId from server has no case
 
         // const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined // if not string then undefined
@@ -139,14 +139,20 @@ export class Stream {
         return permissions[operation]
     }
 
-    async grantPermission(operation: StreamOperation, userId: string|undefined) {
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : AddressZero
-        await this._client.grantPermission(this.id, operation, userIdCaseInsensitive)
+    async grantPermission(operation: StreamOperation, recipientId: EthereumAddress) {
+        await this._client.grantPermission(this.id, operation, recipientId.toLowerCase())
     }
 
-    async revokePermission(operation: StreamOperation, userId: string|undefined) {
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : AddressZero
-        await this._client.revokePermission(this.id, operation, userIdCaseInsensitive)
+    async grantPublicPermission(operation: StreamOperation) {
+        await this._client.grantPublicPermission(this.id, operation)
+    }
+
+    async revokePermission(operation: StreamOperation, recipientId: EthereumAddress) {
+        await this._client.revokePermission(this.id, operation, recipientId.toLowerCase())
+    }
+
+    async revokePublicPermission(operation: StreamOperation) {
+        await this._client.revokePublicPermission(this.id, operation)
     }
 
     async detectFields() {

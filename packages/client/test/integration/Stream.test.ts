@@ -59,19 +59,10 @@ describe('Stream', () => {
             const stream : Stream = await client.getStream(streamId)
             expect(stream.id).toEqual(streamId)
             expect(stream.name).toEqual(testProps.name)
-            const permissions : StreamPermission[] = await stream.getMyPermissions()
-            // expect(permissions[0].operation).toEqual(StreamOperation.STREAM_EDIT)
-            // expect(permissions[1].operation).toEqual(StreamOperation.STREAM_DELETE)
-            // expect(permissions[2].operation).toEqual(StreamOperation.STREAM_SUBSCRIBE)
-            // expect(permissions[3].operation).toEqual(StreamOperation.STREAM_PUBLISH)
-            // expect(permissions[4].operation).toEqual(StreamOperation.STREAM_SHARE)
-            for (const permission of permissions) {
-                // const directpermission: StreamPermission = permission as StreamPermission
-                expect(permission.userAddress.toLowerCase()).toEqual(userAddress)
-            }
+            const permission : StreamPermission = await stream.getMyPermissions()
+            expect(permission.userAddress.toLowerCase()).toEqual(userAddress)
         })
         it('listStreams', async () => {
-            // console.log(streamId)
             setTimeout(async () => {
                 const res = await client.listStreams({})
                 console.log(res)

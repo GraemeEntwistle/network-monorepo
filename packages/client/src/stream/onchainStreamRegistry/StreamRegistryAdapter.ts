@@ -79,16 +79,13 @@ export class StreamRegistryAdapter {
 
     }
     async getAllPermissionsForStream(streamid: string): Promise<Array<StreamPermission>> {
-        // await this.connectToEthereum()
-        // const a = this.ethereum.getAddress()
-        // console.log(id);
         const query: string = StreamRegistryAdapter.buildGetSingleStreamQuery(streamid)
-        // console.log('######' + query)
         const res = await this.queryTheGraph(query)
         const resJson = await res.json()
-        // console.log(JSON.stringify(resJson))
+        if (!resJson.data.stream) {
+            throw new NotFoundError('stream not found: id: ' + streamid)
+        }
         return resJson.data.stream.permissions.map((permissionobj: any) => {
-            // return new Stream(this.client, StreamRegistryOnchain.parseStreamProps(streamobj.id, streamobj.metadata))
             const permission = {
                 ...permissionobj,
                 streamId: permissionobj.id
@@ -100,7 +97,8 @@ export class StreamRegistryAdapter {
 
     async listStreams(filter: StreamListQuery): Promise<Stream[]> {
 
-        const gqlquery: string = StreamRegistryAdapter.buildGetFilteredStreamListQuery(filter.name)
+        const gqlquery: string = StreamRegistryAdapter
+            .buildGetFilteredStreamListQuery(filter)
         // console.log('######' + query)
         const res = await this.queryTheGraph(gqlquery)
         const resJson = await res.json()
@@ -133,26 +131,6 @@ export class StreamRegistryAdapter {
         })
     }
 
-    static buildGetPermissionGQLQuery(streamid: string): string {
-        const query = `{
-            stream (  where: {
-              id: "${streamid}"}) {
-             id,
-             metadata,
-             permissions {
-               id,
-               userAddress,
-               edit,
-               canDelete,
-               publishExpiration,
-               subscribeExpiration,
-               share,
-             }
-           }
-         }`
-        return JSON.stringify({ query })
-    }
-
     static buildGetSingleStreamQuery(streamid: string): string {
         const query = `{
             stream (id: "${streamid}") {
@@ -172,17 +150,20 @@ export class StreamRegistryAdapter {
         return JSON.stringify({ query })
     }
 
-    static buildGetFilteredStreamListQuery(name?: string): string {
-        const nameparam = name ? `metadata_contains: "name\\\\\\":\\\\\\"${name}"` : ''
+    static buildGetFilteredStreamListQuery(filter: StreamListQuery): string {
+        const nameparam = filter.name ? `metadata_contains: "name\\\\\\":\\\\\\"${filter.name}"` : ''
+        const maxparam = filter.max ? `, first: ${filter.max}` : ''
+        const offsetparam = filter.offset ? `, skip: ${filter.offset}` : ''
+        const orderByParam = filter.sortBy ? `, orderBy: ${filter.sortBy}` : ''
+        const ascDescParama = filter.order ? `, orderDirection: ${filter.order}` : ''
         const query = `{
-            streams (where: {${nameparam}}) 
+            streams (where: {${nameparam}}${maxparam}${offsetparam}${orderByParam}${ascDescParama}) 
               { id, metadata, permissions 
                 { id, userAddress, edit, canDelete, publishExpiration, 
                   subscribeExpiration, share 
                 } 
               } 
           }`
-        // return JSON.stringify({ query })
         return JSON.stringify({ query })
     }
 
@@ -416,9 +397,23 @@ export class StreamRegistryAdapter {
         await tx?.wait()
     }
 
+    async grantPublicPermission(streamId: string, operation: StreamOperation) {
+        await this.connectToEthereum()
+        const tx = await this.streamRegistry?.grantPublicPermission(streamId,
+            StreamRegistryAdapter.streamOperationToSolidityType(operation))
+        await tx?.wait()
+    }
+
     async revokePermission(streamId: string, operation: StreamOperation, recievingUser: string) {
         await this.connectToEthereum()
         const tx = await this.streamRegistry?.revokePermission(streamId, recievingUser,
+            StreamRegistryAdapter.streamOperationToSolidityType(operation))
+        await tx?.wait()
+    }
+
+    async revokePublicPermission(streamId: string, operation: StreamOperation) {
+        await this.connectToEthereum()
+        const tx = await this.streamRegistry?.revokePublicPermission(streamId,
             StreamRegistryAdapter.streamOperationToSolidityType(operation))
         await tx?.wait()
     }

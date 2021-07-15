@@ -13,7 +13,6 @@ import { StreamPart } from '../stream/StreamPart'
 import authFetch, { ErrorCode, NotFoundError } from './authFetch'
 import { EthereumAddress } from '../types'
 import { StreamrClient } from '../StreamrClient'
-import { StreamRegistryAdapter } from '../stream/onchainStreamRegistry/StreamRegistryAdapter'
 // TODO change this import when streamr-client-protocol exports StreamMessage type or the enums types directly
 import { ContentType, EncryptionType, SignatureType, StreamMessageType } from 'streamr-client-protocol/dist/src/protocol/message_layer/StreamMessage'
 import { StorageNode } from '../stream/StorageNode'
