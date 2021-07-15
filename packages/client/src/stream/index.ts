@@ -45,8 +45,6 @@ export class StreamProperties {
         fields: Field[];
     }
     partitions?: number // error if  not number+ >0, 1 default
-    requireSignedData?: boolean
-    requireEncryptedData?: boolean
     storageDays?: number
     inactivityThresholdHours?: number
 }
@@ -100,7 +98,7 @@ export class Stream {
     }
 
     async update() {
-        this._client.updateStream(this.toObject())
+        await this._client.updateStream(this.toObject())
     }
 
     /** @internal */

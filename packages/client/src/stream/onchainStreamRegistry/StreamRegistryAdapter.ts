@@ -181,7 +181,7 @@ export class StreamRegistryAdapter {
     }
     static buildIsPublisherQuery(streamId: string, userAddess: EthereumAddress): string {
         const query = `{
-            stream (id: "${streamId}") 
+            stream (id: "${streamId}")
               { id, metadata, permissions (where: {userAddress: "${userAddess}", publishExpiration_gt: "${Date.now()}"})
                 { id, userAddress, edit, canDelete, publishExpiration, 
                   subscribeExpiration, share 
@@ -257,6 +257,7 @@ export class StreamRegistryAdapter {
         this.client.debug('createStream %o', {
             props,
         })
+
         let properties = props || {}
         await this.connectToEthereum()
         const userAddress: string = (await this.ethereum.getAddress()).toLowerCase()
