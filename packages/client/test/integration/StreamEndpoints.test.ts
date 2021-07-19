@@ -1,15 +1,15 @@
-import { ethers, Wallet } from 'ethers'
+import { Wallet } from '@ethersproject/wallet'
+import { Utils } from 'streamr-client-protocol'
 import { EthereumAddress } from '../../src'
-// import { NotFoundError, ValidationError } from '../../src/rest/authFetch'
 import { Stream, StreamOperation, StreamProperties } from '../../src/stream'
-import { StreamRegistry } from '../../src/stream/onchainStreamRegistry/StreamRegistry'
 import { StorageNode } from '../../src/stream/StorageNode'
 import { StreamrClient } from '../../src/StreamrClient'
+import { until } from '../../src/utils'
 import { uid, fakeAddress } from '../utils'
 
 import config from './config'
 
-jest.setTimeout(10000)
+jest.setTimeout(100000)
 
 /**
  * These tests should be run in sequential order!
@@ -37,13 +37,8 @@ function TestStreamEndpoints(getName: () => string) {
 
     beforeAll(() => {
         const key = config.clientOptions.auth.privateKey
-        wallet = new ethers.Wallet(key)
-        // a = ethers.Wallet.from
-        client = createClient({
-            // auth: {
-            //     privateKey: wallet.privateKey,
-            // },
-        })
+        wallet = new Wallet(key)
+        client = createClient({})
     })
 
     beforeAll(async () => {
@@ -105,9 +100,54 @@ function TestStreamEndpoints(getName: () => string) {
             const props = getNewProps()
             props.name = 'name-' + Date.now()
             const stream = await client.createStream(props)
-            await new Promise((resolve) => setTimeout(resolve, 5000))
+            // await new Promise((resolve) => setTimeout(resolve, 5000))
+            const id = (await client.getAddress()).toLowerCase() + props.id
+            await until(async () => {
+                try {
+                    return (await client.getStream(id)).id === id
+                } catch (err) {
+                    return false
+                }
+            }, 100000, 1000)
             const existingStream = await client.getStreamByName(stream.name)
             return expect(existingStream.id).toEqual(stream.id)
+        })
+
+        it('get a non-existing Stream', async () => {
+            const name = `${wallet.address.toLowerCase()}/StreamEndpoints-nonexisting-${Date.now()}`
+            return expect(() => client.getStreamByName(name)).rejects.toThrow()
+        })
+    })
+
+    describe('liststreams with search and filters', () => {
+        it('get streamlist', async () => {
+            // create n streams to test offset and max
+            const name = 'filter-' + Date.now()
+            for (let i = 0; i < 3; i++) {
+                const props = getNewProps()
+                props.name = name + i
+                // eslint-disable-next-line no-await-in-loop
+                await client.createStream(props)
+            }
+            await until(async () => { return (await client.listStreams({ name })).length === 3 }, 10000, 1000)
+            let resultList = await client.listStreams({
+                name
+            })
+            expect(resultList.length).toBe(3)
+            resultList = await client.listStreams({
+                name,
+                max: 2,
+            })
+            expect(resultList.length).toBe(2)
+            expect(resultList[0].name.endsWith('0')).toBe(true)
+            expect(resultList[1].name.endsWith('1')).toBe(true)
+            resultList = await client.listStreams({
+                name,
+                max: 2,
+                offset: 1
+            })
+            expect(resultList[0].name.endsWith('1')).toBe(true)
+            return expect(resultList[1].name.endsWith('2')).toBe(true)
         })
 
         it('get a non-existing Stream', async () => {
@@ -234,15 +274,6 @@ function TestStreamEndpoints(getName: () => string) {
         })
     })
 
-    describe('getStreamValidationInfo', () => {
-        it('returns an object with expected fields', async () => {
-            const result = await client.getStreamValidationInfo(createdStream.id)
-            expect(result.partitions > 0).toBeTruthy()
-            expect(result.requireSignedData === true).toBeTruthy()
-            return expect(result.requireEncryptedData === false).toBeTruthy()
-        })
-    })
-
     describe('Stream.update', () => {
         it('can change stream name', async () => {
             createdStream.name = 'New name'
@@ -254,7 +285,6 @@ function TestStreamEndpoints(getName: () => string) {
 
     describe('Stream permissions', () => {
         it('Stream.getPermissions', async () => {
-            await new Promise((resolve) => setTimeout(resolve, 2000))
             const permissions = await createdStream.getPermissions()
             return expect(permissions.length).toBe(1)
         })
