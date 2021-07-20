@@ -1,11 +1,11 @@
 import { Wallet } from '@ethersproject/wallet'
-import { Utils } from 'streamr-client-protocol'
 import { EthereumAddress } from '../../src'
-import { Stream, StreamOperation, StreamProperties } from '../../src/stream'
+import { Stream, StreamOperation } from '../../src/stream'
 import { StorageNode } from '../../src/stream/StorageNode'
 import { StreamrClient } from '../../src/StreamrClient'
 import { until } from '../../src/utils'
-import { uid, fakeAddress } from '../utils'
+import { uid, fakeAddress, getNewProps } from '../utils'
+import { id } from '@ethersproject/hash'
 
 import config from './config'
 
@@ -14,13 +14,6 @@ jest.setTimeout(100000)
 /**
  * These tests should be run in sequential order!
  */
-let counter = 0
-const getNewProps = () : StreamProperties => {
-    counter += 1
-    return {
-        id: `/path-${Date.now()}-${counter}`
-    }
-}
 
 function TestStreamEndpoints(getName: () => string) {
     let client: StreamrClient
@@ -36,9 +29,13 @@ function TestStreamEndpoints(getName: () => string) {
     } as any)
 
     beforeAll(() => {
-        const key = config.clientOptions.auth.privateKey
-        wallet = new Wallet(key)
-        client = createClient({})
+        // const key = config.clientOptions.auth.privateKey
+        const hash = id(`marketplace-contracts${0}`)
+        // return new Wallet(hash, provider)
+        wallet = new Wallet(hash)
+        client = createClient({ auth: {
+            privateKey: hash
+        } })
     })
 
     beforeAll(async () => {
@@ -90,8 +87,8 @@ function TestStreamEndpoints(getName: () => string) {
         })
 
         it('get a non-existing Stream', async () => {
-            const id = `${wallet.address.toLowerCase()}/StreamEndpoints-nonexisting-${Date.now()}`
-            return expect(() => client.getStream(id)).rejects.toThrow()
+            const streamid = `${wallet.address.toLowerCase()}/StreamEndpoints-nonexisting-${Date.now()}`
+            return expect(() => client.getStream(streamid)).rejects.toThrow()
         })
     })
 
@@ -101,10 +98,10 @@ function TestStreamEndpoints(getName: () => string) {
             props.name = 'name-' + Date.now()
             const stream = await client.createStream(props)
             // await new Promise((resolve) => setTimeout(resolve, 5000))
-            const id = (await client.getAddress()).toLowerCase() + props.id
+            const streamid = (await client.getAddress()).toLowerCase() + props.id
             await until(async () => {
                 try {
-                    return (await client.getStream(id)).id === id
+                    return (await client.getStream(streamid)).id === streamid
                 } catch (err) {
                     return false
                 }

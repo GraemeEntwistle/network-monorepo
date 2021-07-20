@@ -1,17 +1,28 @@
 import { inspect } from 'util'
 import { wait } from 'streamr-test-utils'
-import { providers, Wallet } from 'ethers'
 import { pTimeout, counterId, AggregatedError } from '../src/utils'
 import { MaybeAsync } from '../src/types'
 import { validateOptions } from '../src/stream/utils'
-import type { StreamPartDefinitionOptions } from '../src/stream'
+import type { StreamPartDefinitionOptions, StreamProperties } from '../src/stream'
 import { StreamrClient } from '../src/StreamrClient'
 import { PublishRequest } from 'streamr-client-protocol/dist/src/protocol/control_layer'
+import { Wallet } from '@ethersproject/wallet'
+import { JsonRpcProvider } from '@ethersproject/providers'
 
 const crypto = require('crypto')
 const config = require('./integration/config')
 
 export const uid = (prefix?: string) => counterId(`p${process.pid}${prefix ? '-' + prefix : ''}`)
+
+let pathCounter = 0
+export function getNewProps(): StreamProperties {
+    pathCounter += 1
+    return {
+        // only counter is not sufficient, because re-running the test
+        // would result in the same path and creating streams would fail
+        id: `/path-${Date.now()}-${pathCounter}`
+    }
+}
 
 export function fakePrivateKey() {
     return crypto.randomBytes(32).toString('hex')
@@ -286,7 +297,7 @@ export function getPublishTestMessages(client: StreamrClient, defaultOptsOrStrea
 
 export const createMockAddress = () => '0x000000000000000000000000000' + Date.now()
 
-export const createClient = (providerSidechain?: providers.JsonRpcProvider) => {
+export const createClient = (providerSidechain?: JsonRpcProvider) => {
     const wallet = new Wallet(`0x100000000000000000000000000000000000000012300000001${Date.now()}`, providerSidechain)
     return new StreamrClient({
         ...config.clientOptions,

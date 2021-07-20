@@ -10,11 +10,12 @@ import { StorageNode } from '../../src/stream/StorageNode'
 import config from './config'
 
 const { ControlMessage } = ControlLayer
+const { privateKey } = config.clientOptions.auth
 
 const createClient = (opts = {}) => new StreamrClient({
     ...config.clientOptions,
     auth: {
-        privateKey: fakePrivateKey()
+        privateKey
     },
     autoConnect: false,
     autoDisconnect: false,
@@ -29,7 +30,6 @@ describeRepeats('PubSub with multiple clients', () => {
     let stream
     let mainClient
     let otherClient
-    let privateKey
     let errors = []
 
     const addAfter = addAfterFn()
@@ -40,8 +40,6 @@ describeRepeats('PubSub with multiple clients', () => {
 
     beforeEach(async () => {
         errors = []
-        privateKey = fakePrivateKey()
-
         mainClient = createClient({
             id: 'main',
             auth: {
@@ -52,7 +50,7 @@ describeRepeats('PubSub with multiple clients', () => {
         stream = await mainClient.createStream({
             name: uid('stream')
         })
-        await stream.addToStorageNode(StorageNode.STREAMR_DOCKER_DEV)
+        // await stream.addToStorageNode(StorageNode.STREAMR_DOCKER_DEV)
     })
 
     afterEach(async () => {
@@ -78,7 +76,7 @@ describeRepeats('PubSub with multiple clients', () => {
     async function createPublisher(opts = {}) {
         const pubClient = createClient({
             auth: {
-                privateKey: fakePrivateKey(),
+                privateKey,
             },
             ...opts,
         })

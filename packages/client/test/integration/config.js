@@ -34,7 +34,7 @@ module.exports = {
         },
         autoConnect: false,
         autoDisconnect: false,
-        streamRegistrySidechainAddress: '0x256D4CB67452b6b8280B2b67F040fD22f1C378f4',
+        streamRegistrySidechainAddress: '0xb373D086bDeA2d482471B570205D29d215813DB9',
         ensCacheSidechainAddress: '0xD1d514082ED630687a5DCB85406130eD0745fA06'
     },
     tokenMediator: '0xedD2aa644a6843F2e5133Fe3d6BD3F4080d97D9F',

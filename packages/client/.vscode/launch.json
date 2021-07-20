@@ -10,7 +10,7 @@
             "request": "launch",
             "name": "Jest single test",
             "program": "${workspaceRoot}/node_modules/jest/bin/jest.js",
-            "env": { "CI": "true" },
+            "env": { "CI": "true", "STREAMR_DOCKER_DEV_HOST": "192.168.2.112" },
             "args": [
             //   "-c",
             //   "./config/test/jest.json",
