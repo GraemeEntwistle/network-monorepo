@@ -8,6 +8,8 @@ export { GroupKey } from './encryption/Encryption'
 import { StorageNode } from './StorageNode'
 import { StreamrClient } from '../StreamrClient'
 import { EthereumAddress } from '../types'
+import { AddressZero } from '@ethersproject/constants'
+import { BigNumber } from '@ethersproject/bignumber'
 
 // TODO explicit types: e.g. we never provide both streamId and id, or both streamPartition and partition
 export type StreamPartDefinitionOptions = {
@@ -22,40 +24,33 @@ export type StreamPartDefinition = string | StreamPartDefinitionOptions
 
 export type ValidatedStreamPartDefinition = { streamId: string, streamPartition: number, key: string}
 
-interface StreamPermisionBase {
-    id: number
-    operation: StreamOperation
+export interface StreamPermission {
+    streamId: string
+    userAddress: string
+    edit: boolean
+    canDelete: boolean
+    publishExpiration: BigNumber
+    subscribeExpiration: BigNumber
+    share: boolean
 }
-
-export interface UserStreamPermission extends StreamPermisionBase {
-    user: string
-}
-
-export interface AnonymousStreamPermisson extends StreamPermisionBase {
-    anonymous: true
-}
-
-export type StreamPermision = UserStreamPermission | AnonymousStreamPermisson
 
 export enum StreamOperation {
-    STREAM_GET = 'stream_get',
-    STREAM_EDIT = 'stream_edit',
-    STREAM_DELETE = 'stream_delete',
-    STREAM_PUBLISH = 'stream_publish',
-    STREAM_SUBSCRIBE = 'stream_subscribe',
-    STREAM_SHARE = 'stream_share'
+    // STREAM_GET = 'stream_get',
+    STREAM_EDIT = 'edit',
+    STREAM_DELETE = 'canDelete',
+    STREAM_PUBLISH = 'publishExpiration',
+    STREAM_SUBSCRIBE = 'subscribeExpiration',
+    STREAM_SHARE = 'share'
 }
 
-export interface StreamProperties {
+export class StreamProperties {
     id?: string
     name?: string
     description?: string
     config?: {
         fields: Field[];
     }
-    partitions?: number
-    requireSignedData?: boolean
-    requireEncryptedData?: boolean
+    partitions?: number // error if  not number+ >0, 1 default
     storageDays?: number
     inactivityThresholdHours?: number
 }
@@ -86,7 +81,7 @@ function getFieldType(value: any): (Field['type'] | undefined) {
     }
 }
 
-class StreamrStream {
+export class Stream {
     // @ts-expect-error
     id: string
     // @ts-expect-error
@@ -109,15 +104,7 @@ class StreamrStream {
     }
 
     async update() {
-        const json = await authFetch<StreamProperties>(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id),
-            this._client.session,
-            {
-                method: 'PUT',
-                body: JSON.stringify(this.toObject()),
-            },
-        )
-        return json ? new StreamrStream(this._client, json) : undefined
+        await this._client.updateStream(this.toObject())
     }
 
     /** @internal */
@@ -133,76 +120,43 @@ class StreamrStream {
     }
 
     async delete() {
-        await authFetch(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id),
-            this._client.session,
-            {
-                method: 'DELETE',
-            },
-        )
+        await this._client.deleteStream(this.id)
     }
 
     async getPermissions() {
-        return authFetch<StreamPermision[]>(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions'),
-            this._client.session,
-        )
+        return this._client.getAllPermissionsForStream(this.id)
     }
 
     async getMyPermissions() {
-        return authFetch<StreamPermision[]>(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions', 'me'),
-            this._client.session,
-        )
+        return this._client.getPermissionsForUser(this.id, await this._client.getAddress())
     }
 
-    async hasPermission(operation: StreamOperation, userId: string|undefined) {
+    async hasPermission(operation: StreamOperation, userId: EthereumAddress) {
         // eth addresses may be in checksumcase, but userId from server has no case
 
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined // if not string then undefined
-        const permissions = await this.getPermissions()
+        // const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined // if not string then undefined
+        const permissions = await this._client.getPermissionsForUser(this.id, userId)
 
-        return permissions.find((p: any) => {
-            if (p.operation !== operation) { return false }
-
-            if (userIdCaseInsensitive === undefined) {
-                return !!p.anonymous // match nullish userId against p.anonymous
-            }
-            return p.user && p.user.toLowerCase() === userIdCaseInsensitive // match against userId
-        })
+        if (operation === StreamOperation.STREAM_PUBLISH || operation === StreamOperation.STREAM_SUBSCRIBE) {
+            return permissions[operation].gt(Date.now())
+        }
+        return permissions[operation]
     }
 
-    async grantPermission(operation: StreamOperation, userId: string|undefined) {
-        const permissionObject: any = {
-            operation,
-        }
-
-        const userIdCaseInsensitive = typeof userId === 'string' ? userId.toLowerCase() : undefined
-
-        if (userIdCaseInsensitive !== undefined) {
-            permissionObject.user = userIdCaseInsensitive
-        } else {
-            permissionObject.anonymous = true
-        }
-
-        return authFetch<StreamPermision>(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions'),
-            this._client.session,
-            {
-                method: 'POST',
-                body: JSON.stringify(permissionObject),
-            },
-        )
+    async grantPermission(operation: StreamOperation, recipientId: EthereumAddress) {
+        await this._client.grantPermission(this.id, operation, recipientId.toLowerCase())
     }
 
-    async revokePermission(permissionId: number) {
-        await authFetch(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'permissions', String(permissionId)),
-            this._client.session,
-            {
-                method: 'DELETE',
-            },
-        )
+    async grantPublicPermission(operation: StreamOperation) {
+        await this._client.grantPublicPermission(this.id, operation)
+    }
+
+    async revokePermission(operation: StreamOperation, recipientId: EthereumAddress) {
+        await this._client.revokePermission(this.id, operation, recipientId.toLowerCase())
+    }
+
+    async revokePublicPermission(operation: StreamOperation) {
+        await this._client.revokePublicPermission(this.id, operation)
     }
 
     async detectFields() {

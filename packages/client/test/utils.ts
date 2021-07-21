@@ -22,6 +22,16 @@ export {
 
 export const uid = (prefix?: string) => counterId(`p${process.pid}${prefix ? '-' + prefix : ''}`)
 
+let pathCounter = 0
+export function getNewProps(): StreamProperties {
+    pathCounter += 1
+    return {
+        // only counter is not sufficient, because re-running the test
+        // would result in the same path and creating streams would fail
+        id: `/path-${Date.now()}-${pathCounter}`
+    }
+}
+
 export function fakePrivateKey() {
     return crypto.randomBytes(32).toString('hex')
 }

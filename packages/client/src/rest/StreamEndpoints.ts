@@ -87,43 +87,11 @@ export class StreamEndpoints {
         this.client = client
     }
 
-    /**
-     * @category Important
-     */
-    async getStream(streamId: string) {
-        this.client.debug('getStream %o', {
-            streamId,
-        })
-
-        if (isKeyExchangeStream(streamId)) {
-            return new Stream(this.client, {
-                id: streamId,
-                partitions: 1,
-            })
-        }
-
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId)
-        const json = await authFetch<StreamProperties>(url, this.client.session)
-        return new Stream(this.client, json)
-    }
-
-    /**
-     * @category Important
-     */
-    async listStreams(query: StreamListQuery = {}): Promise<Stream[]> {
-        this.client.debug('listStreams %o', {
-            query,
-        })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams') + '?' + qs.stringify(query)
-        const json = await authFetch<StreamProperties[]>(url, this.client.session)
-        return json ? json.map((stream: StreamProperties) => new Stream(this.client, stream)) : []
-    }
-
     async getStreamByName(name: string) {
         this.client.debug('getStreamByName %o', {
             name,
         })
-        const json = await this.listStreams({
+        const json = await this.client.listStreams({
             name,
             // @ts-expect-error
             public: false,
@@ -133,103 +101,31 @@ export class StreamEndpoints {
 
     /**
      * @category Important
-     * @param props - if id is specified, it can be full streamId or path
      */
-    async createStream(props?: Partial<StreamProperties> & { id: string }) {
-        this.client.debug('createStream %o', {
-            props,
-        })
-        const body = (props?.id !== undefined) ? {
-            ...props,
-            id: await createStreamId(props.id, () => this.client.getAddress())
-        } : props
-        const json = await authFetch<StreamProperties>(
-            getEndpointUrl(this.client.options.restUrl, 'streams'),
-            this.client.session,
-            {
-                method: 'POST',
-                body: JSON.stringify(body),
-            },
-        )
-        return new Stream(this.client, json)
-    }
-
-    /**
-     * @category Important
-     */
-    async getOrCreateStream(props: { id: string, name?: never } | { id?: never, name: string }) {
+    async getOrCreateStream(props: { id?: string, name?: string }) {
         this.client.debug('getOrCreateStream %o', {
             props,
         })
         // Try looking up the stream by id or name, whichever is defined
         try {
             if (props.id) {
-                return await this.getStream(props.id)
-            }
-            return await this.getStreamByName(props.name!)
-        } catch (err: any) {
-            // try create stream if NOT_FOUND + also supplying an id.
-            if (props.id && err.errorCode === ErrorCode.NOT_FOUND) {
-                const stream = await this.createStream(props)
-                debug('Created stream: %s', props.id, stream.toObject())
+                const stream = await this.client.getStream(props.id)
                 return stream
             }
 
-            throw err
-        }
-    }
-
-    async getStreamPublishers(streamId: string) {
-        this.client.debug('getStreamPublishers %o', {
-            streamId,
-        })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'publishers')
-        const json = await authFetch<{ addresses: string[]}>(url, this.client.session)
-        return json.addresses.map((a: string) => a.toLowerCase())
-    }
-
-    async isStreamPublisher(streamId: string, ethAddress: EthereumAddress) {
-        this.client.debug('isStreamPublisher %o', {
-            streamId,
-            ethAddress,
-        })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'publisher', ethAddress)
-        try {
-            await authFetch(url, this.client.session)
-            return true
-        } catch (e) {
-            this.client.debug(e)
-            if (e.response && e.response.status === 404) {
-                return false
+            if (props.name) {
+                const stream = await this.getStreamByName(props.name)
+                return stream
             }
-            throw e
-        }
-    }
-
-    async getStreamSubscribers(streamId: string) {
-        this.client.debug('getStreamSubscribers %o', {
-            streamId,
-        })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'subscribers')
-        const json = await authFetch<{ addresses: string[] }>(url, this.client.session)
-        return json.addresses.map((a: string) => a.toLowerCase())
-    }
-
-    async isStreamSubscriber(streamId: string, ethAddress: EthereumAddress) {
-        this.client.debug('isStreamSubscriber %o', {
-            streamId,
-            ethAddress,
-        })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'subscriber', ethAddress)
-        try {
-            await authFetch(url, this.client.session)
-            return true
-        } catch (e) {
-            if (e.response && e.response.status === 404) {
-                return false
+        } catch (err: any) {
+            if (err.errorCode !== ErrorCode.NOT_FOUND) {
+                throw err
             }
-            throw e
         }
+
+        const stream = await this.client.createStream(props)
+        debug('Created stream: %s (%s)', props.name, stream.id)
+        return stream
     }
 
     async getStreamValidationInfo(streamId: string) {

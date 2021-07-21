@@ -66,8 +66,11 @@ export type StrictStreamrClientOptions = {
     withdrawServerUrl: string
     mainnet?: ConnectionInfo|string
     sidechain: ConnectionInfo & { chainId?: number }
+    theGraphUrl: string
     tokenAddress: EthereumAddress,
     tokenSidechainAddress: EthereumAddress,
+    streamRegistrySidechainAddress: EthereumAddress,
+    ensCacheSidechainAddress: EthereumAddress,
     dataUnion: {
         /**
          * Threshold value set in AMB configs, smallest token amount to pass over the bridge if
@@ -119,6 +122,7 @@ export const STREAM_CLIENT_DEFAULTS: StrictStreamrClientOptions = {
     url: 'wss://streamr.network/api/v1/ws',
     restUrl: 'https://streamr.network/api/v1',
     streamrNodeAddress: '0xf3E5A65851C3779f468c9EcB32E6f25D9D68601a',
+    theGraphUrl: 'http://192.168.2.112:8000/subgraphs/name/githubname/subgraphname/',
 
     // P2P Streamr Network options
     autoConnect: true,
@@ -154,6 +158,8 @@ export const STREAM_CLIENT_DEFAULTS: StrictStreamrClientOptions = {
     binanceAdapterAddress: '0x0c1aF6edA561fbDA48E9A7B1Dd46D216F31A97cC',
     binanceSmartChainAMBAddress: '0x05185872898b6f94aa600177ef41b9334b1fa48b',
     withdrawServerUrl: 'https://streamr.com:3000',
+    streamRegistrySidechainAddress: '0xc24BA8c05E5206F1bE57bfA0aD14E9882126eD38',
+    ensCacheSidechainAddress: '0xD1d514082ED630687a5DCB85406130eD0745fA06',
     dataUnion: {
         minimumWithdrawTokenWei: '1000000',
         payForTransport: true,
