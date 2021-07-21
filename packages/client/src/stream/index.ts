@@ -8,7 +8,6 @@ export { GroupKey } from './encryption/Encryption'
 import { StorageNode } from './StorageNode'
 import { StreamrClient } from '../StreamrClient'
 import { EthereumAddress } from '../types'
-import { AddressZero } from '@ethersproject/constants'
 import { BigNumber } from '@ethersproject/bignumber'
 
 // TODO explicit types: e.g. we never provide both streamId and id, or both streamPartition and partition
@@ -81,7 +80,7 @@ function getFieldType(value: any): (Field['type'] | undefined) {
     }
 }
 
-export class Stream {
+class StreamrStream {
     // @ts-expect-error
     id: string
     // @ts-expect-error

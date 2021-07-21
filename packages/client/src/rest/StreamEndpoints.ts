@@ -5,10 +5,9 @@ import qs from 'qs'
 
 import { getEndpointUrl } from '../utils'
 import { Debug } from '../utils/log'
-import { createStreamId, validateOptions } from '../stream/utils'
-import { Stream, StreamOperation, StreamProperties } from '../stream'
+import { validateOptions } from '../stream/utils'
+import { Stream, StreamOperation } from '../stream'
 import { StreamPart } from '../stream/StreamPart'
-import { isKeyExchangeStream } from '../stream/encryption/KeyExchangeUtils'
 
 import authFetch, { ErrorCode, NotFoundError } from './authFetch'
 import { EthereumAddress } from '../types'
@@ -31,12 +30,6 @@ export interface StreamListQuery {
     grantedAccess?: boolean
     publicAccess?: boolean
     operation?: StreamOperation
-}
-
-export interface StreamValidationInfo {
-    partitions: number,
-    requireSignedData: boolean
-    requireEncryptedData: boolean
 }
 
 export interface StreamMessageAsObject { // TODO this could be in streamr-protocol
@@ -126,15 +119,6 @@ export class StreamEndpoints {
         const stream = await this.client.createStream(props)
         debug('Created stream: %s (%s)', props.name, stream.id)
         return stream
-    }
-
-    async getStreamValidationInfo(streamId: string) {
-        this.client.debug('getStreamValidationInfo %o', {
-            streamId,
-        })
-        const url = getEndpointUrl(this.client.options.restUrl, 'streams', streamId, 'validation')
-        const json = await authFetch<StreamValidationInfo>(url, this.client.session)
-        return json
     }
 
     async getStreamLast(streamObjectOrId: Stream|string): Promise<StreamMessageAsObject> {

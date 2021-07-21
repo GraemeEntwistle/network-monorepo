@@ -7,7 +7,7 @@ import {
     getStreamId
 } from './common'
 import pkg from '../package.json'
-import { AnonymousStreamPermisson, StreamOperation, StreamrClient, UserStreamPermission } from 'streamr-client'
+import { StreamOperation, StreamrClient, StreamPermission } from 'streamr-client'
 import EasyTable from 'easy-table'
 
 const PUBLIC_PERMISSION_ID = 'public'
@@ -54,13 +54,14 @@ envOptions(program)
         const client = new StreamrClient(formStreamrOptionsWithEnv(options))
         const streamId = getStreamId(streamIdOrPath, options)!
         const stream = await client.getStream(streamId)
-        const tasks = operations.map((operation: StreamOperation) => stream.grantPermission(operation, target))
+        let tasks
+        if (target) {
+            tasks = operations.map((operation: StreamOperation) => stream.grantPermission(operation, target))
+        } else {
+            tasks = operations.map((operation: StreamOperation) => stream.grantPublicPermission(operation))
+        }
         const permissions = await Promise.all(tasks)
-        console.info(EasyTable.print(permissions.map((permission: UserStreamPermission|AnonymousStreamPermisson) => ({
-            id: permission.id,
-            operation: getShortOperationId(permission.operation),
-            user: (permission as AnonymousStreamPermisson).anonymous ? PUBLIC_PERMISSION_ID : (permission as UserStreamPermission).user
-        }))))
+        console.info(EasyTable.print(permissions))
     })
     .parseAsync(process.argv)
     .catch((e) => {
