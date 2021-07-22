@@ -25,7 +25,7 @@ import { Contract } from '@ethersproject/contracts'
 import { GroupKey, StreamPartDefinition } from './stream'
 import { BytesLike } from '@ethersproject/bytes'
 import Contracts from './dataunion/Contracts'
-import { StreamRegistryAdapter } from './stream/onchainStreamRegistry/StreamRegistryAdapter'
+import { StreamRegistry } from './stream/StreamRegistry'
 
 // TODO get metadata type from streamr-protocol-js project (it doesn't export the type definitions yet)
 export type OnMessageCallback = MaybeAsync<(message: any, metadata: any) => void>
@@ -167,7 +167,7 @@ function Plugin(targetInstance: any, srcInstance: any) {
 }
 
 // these are mixed in via Plugin function above
-export interface StreamrClient extends StreamEndpoints, StreamRegistryAdapter, LoginEndpoints, Publisher, Subscriber {}
+export interface StreamrClient extends StreamEndpoints, StreamRegistry, LoginEndpoints, Publisher, Subscriber {}
 
 /**
  * @category Important
@@ -230,7 +230,7 @@ export class StreamrClient extends EventEmitter { // eslint-disable-line no-rede
 
         Plugin(this, new StreamEndpoints(this))
         Plugin(this, new LoginEndpoints(this))
-        Plugin(this, new StreamRegistryAdapter(this))
+        Plugin(this, new StreamRegistry(this))
         this.cached = new StreamrCached(this)
     }
 

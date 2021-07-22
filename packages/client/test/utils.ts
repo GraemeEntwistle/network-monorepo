@@ -289,7 +289,6 @@ export function getPublishTestMessages(client: StreamrClient, defaultOptsOrStrea
 
                 published.push([
                     message,
-                    // @ts-expect-error
                     request,
                 ])
 

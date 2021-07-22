@@ -4,10 +4,10 @@ import { Stream, StreamOperation } from '../../src/stream'
 import { StorageNode } from '../../src/stream/StorageNode'
 import { StreamrClient } from '../../src/StreamrClient'
 import { until } from '../../src/utils'
-import { uid, fakeAddress, getNewProps, createTestStream, createRelativeTestStreamId } from '../utils'
-import { id } from '@ethersproject/hash'
+import { uid, fakeAddress, getNewProps, createTestStream } from '../utils'
+// import { id } from '@ethersproject/hash'
 
-import clientOptions from './config'
+import config from './config'
 
 jest.setTimeout(100000)
 
@@ -18,31 +18,28 @@ jest.setTimeout(100000)
 function TestStreamEndpoints(getName: () => string) {
     let client: StreamrClient
     let wallet: Wallet
-    let createdStreamPath: string
     let createdStream: Stream
 
     const createClient = (opts = {}) => new StreamrClient({
-        ...config.clientOptions,
+        ...config,
         autoConnect: false,
         autoDisconnect: false,
         ...opts,
     } as any)
 
     beforeAll(() => {
-        // const key = config.clientOptions.auth.privateKey
-        const hash = id(`marketplace-contracts${0}`)
+        const key = config.auth.privateKey
+        // const hash = id(`marketplace-contracts${1}`)
         // return new Wallet(hash, provider)
-        wallet = new Wallet(hash)
+        wallet = new Wallet(key)
         client = createClient({ auth: {
-            privateKey: hash
+            privateKey: key
         } })
     })
 
     beforeAll(async () => {
         createdStream = await createTestStream(client, module, {
-            name: getName(),
-            requireSignedData: true,
-            requireEncryptedData: false,
+            name: getName()
         })
     })
 
