@@ -70,6 +70,8 @@ export type StrictStreamrClientOptions = {
     tokenAddress: EthereumAddress,
     tokenSidechainAddress: EthereumAddress,
     streamRegistrySidechainAddress: EthereumAddress,
+    nodeRegistrySidechainAddress: EthereumAddress,
+    streamStorageRegistrySidechainAddress: EthereumAddress,
     ensCacheSidechainAddress: EthereumAddress,
     dataUnion: {
         /**
@@ -158,8 +160,10 @@ export const STREAM_CLIENT_DEFAULTS: StrictStreamrClientOptions = {
     binanceAdapterAddress: '0x0c1aF6edA561fbDA48E9A7B1Dd46D216F31A97cC',
     binanceSmartChainAMBAddress: '0x05185872898b6f94aa600177ef41b9334b1fa48b',
     withdrawServerUrl: 'https://streamr.com:3000',
-    streamRegistrySidechainAddress: '0xc24BA8c05E5206F1bE57bfA0aD14E9882126eD38',
-    ensCacheSidechainAddress: '0xD1d514082ED630687a5DCB85406130eD0745fA06',
+    streamRegistrySidechainAddress: '',
+    nodeRegistrySidechainAddress: '',
+    streamStorageRegistrySidechainAddress: '',
+    ensCacheSidechainAddress: '',
     dataUnion: {
         minimumWithdrawTokenWei: '1000000',
         payForTransport: true,
@@ -169,7 +173,7 @@ export const STREAM_CLIENT_DEFAULTS: StrictStreamrClientOptions = {
         templateSidechainAddress: '0xf1E9d6E254BeA3f0129018AcA1A50AEcb7D528be',
     },
     storageNode: {
-        address: StorageNode.STREAMR_GERMANY.getAddress(),
+        address: StorageNode.STREAMR_GERMANY.address,
         url: 'https://corea1.streamr.network:8001'
     },
     cache: {

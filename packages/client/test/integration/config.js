@@ -24,7 +24,9 @@ module.exports = {
         templateSidechainAddress: process.env.DU_TEMPLATE_SIDECHAIN || '0x36afc8c9283CC866b8EB6a61C6e6862a83cd6ee8',
     },
     streamRegistrySidechainAddress: '0x3fd69E606089fDc2945c1a2624B1342CED48e672',
+    nodeRegistrySidechainAddress: '0x3fd69E606089fDc2945c1a2624B1342CED48e672',
     ensCacheSidechainAddress: '0xD1d514082ED630687a5DCB85406130eD0745fA06',
+    streamStorageRegistrySidechainAddress: '0xD1d514082ED630687a5DCB85406130eD0745fA06',
     storageNode: {
         address: '0xde1112f631486CfC759A50196853011528bC5FA0',
         url: `http://${process.env.STREAMR_DOCKER_DEV_HOST || '10.200.10.1'}:8891`

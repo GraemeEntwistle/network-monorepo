@@ -140,7 +140,7 @@ export class StreamEndpoints {
     }
 
     async getStreamPartsByStorageNode(node: StorageNode|EthereumAddress) {
-        const address = (node instanceof StorageNode) ? node.getAddress() : node
+        const address = (node instanceof StorageNode) ? node.address : node
         type ItemType = { id: string, partitions: number}
         const json = await authFetch<ItemType[]>(getEndpointUrl(this.client.options.restUrl, 'storageNodes', address, 'streams'), this.client.session)
         let result: StreamPart[] = []

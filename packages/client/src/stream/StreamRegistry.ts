@@ -17,6 +17,7 @@ import { StreamListQuery } from '../rest/StreamEndpoints'
 import { NotFoundError } from '../rest/authFetch'
 import { AddressZero } from '@ethersproject/constants'
 import { BigNumber } from '@ethersproject/bignumber'
+import { Provider } from '@ethersproject/providers'
 
 const { ValidationError } = Errors
 
@@ -33,52 +34,57 @@ export type PermissionQueryResult = {
     share: boolean
 }
 
-export type StreamQueryResult = {
+export type StreamPermissionsQueryResult = {
     id: string
     metadata: string
-    permissions: Array<PermissionQueryResult>
+    permissions: [PermissionQueryResult]
+}
+
+export type StreamQueryResult = {
+    id: string,
+    metadata: string
 }
 
 export type AllStreamsQueryResult = {
-    streams: Array<{
-        id: string,
-        metadata: string
-    }>
+    streams: [StreamQueryResult]
 }
 
 export type FilteredStreamListQueryResult = {
-    streams: Array<StreamQueryResult>
+    streams: [StreamPermissionsQueryResult]
 }
 
 export type SingleStreamQueryResult = {
-    stream: StreamQueryResult | null
+    stream: StreamPermissionsQueryResult | null
 }
 
-// export interface StreamRegistryOnchain {}
 export class StreamRegistry {
     readonly client: StreamrClient
     ethereum: StreamrEthereum
     streamRegistryContract?: StreamRegistryContract
-    sideChainProvider?: Signer
+    streamRegistryContractReadonly: StreamRegistryContract
+    sideChainProvider: Provider
+    sideChainSigner?: Signer
 
     constructor(client: StreamrClient) {
         log('creating StreamRegistryOnchain')
         this.client = client
         this.ethereum = client.ethereum
+        this.sideChainProvider = this.ethereum.getSidechainProvider()
+        this.streamRegistryContractReadonly = new Contract(this.client.options.streamRegistrySidechainAddress,
+            StreamRegistryArtifact, this.sideChainProvider) as StreamRegistryContract
     }
 
-    parseStream(id: string, propsString: string): Stream {
+    private parseStream(id: string, propsString: string): Stream {
+        return StreamRegistry.parseStreamFromProps(this.client, id, propsString)
+    }
+
+    /** @internal */
+    static parseStreamFromProps(client: StreamrClient, id: string, propsString: string): Stream {
         try {
-            let parsedProps = JSON.parse(propsString)
-            parsedProps = {
-                ...parsedProps,
-                id
-                // path: id.substring(id.indexOf('/'))
-            }
-            return new Stream(this.client, parsedProps)
+            const parsedProps = JSON.parse(propsString)
+            return new Stream(client, { ...parsedProps, id })
         } catch (error) {
             throw new Error(`Could not parse properties from onchain metadata: ${propsString}`)
-            // return { id, description: 'ERROR IN PROPS' }
         }
     }
 
@@ -86,19 +92,10 @@ export class StreamRegistry {
     // Read from the StreamRegistry contract
     // --------------------------------------------------------------------------------------------
 
-    async connectToEthereum() {
-        if (!this.sideChainProvider || !this.streamRegistryContract) {
-            this.sideChainProvider = await this.ethereum.getSidechainSigner()
-            this.streamRegistryContract = new Contract(this.client.options.streamRegistrySidechainAddress,
-                StreamRegistryArtifact, this.sideChainProvider) as StreamRegistryContract
-        }
-    }
-
     async getStreamFromContract(id: string): Promise<Stream> {
         this.client.debug('getStream %s', id)
-        await this.connectToEthereum()
         try {
-            const propertiesString = await this.streamRegistryContract?.getStreamMetadata(id) || '{}'
+            const propertiesString = await this.streamRegistryContractReadonly.getStreamMetadata(id) || '{}'
             return this.parseStream(id, propertiesString)
         } catch (error) {
             log(error)
@@ -106,24 +103,16 @@ export class StreamRegistry {
         throw new NotFoundError('Stream: id=' + id)
     }
 
-    async getPermissionsForUser(streamId: string, userAddress: EthereumAddress): Promise<StreamPermission> {
-        await this.connectToEthereum()
-        // const userAddress: EthereumAddress = await this.ethereum.getAddress()
-        log('getting permission for stream for user')
-        let permissions
-        if (userAddress) {
-            permissions = await this.streamRegistryContract?.getPermissionsForUser(streamId, userAddress)
-        } else {
-            permissions = await this.streamRegistryContract?.getPermissionsForUser(streamId, AddressZero)
-        }
+    async getPermissionsForUser(streamId: string, userAddress?: EthereumAddress): Promise<StreamPermission> {
+        log('Getting permissions for stream %s for user %s', streamId, userAddress)
+        const permissions = await this.streamRegistryContractReadonly.getPermissionsForUser(streamId, userAddress || AddressZero)
         return {
             streamId,
-            // operation: StreamOperation
-            userAddress,
+            userAddress: userAddress || AddressZero,
             edit: permissions?.edit || false,
             canDelete: permissions?.canDelete || false,
-            publishExpiration: permissions?.publishExpiration || new BigNumber(null, '0x0'),
-            subscribeExpiration: permissions?.subscribeExpiration || new BigNumber(null, '0x0'),
+            publishExpiration: permissions?.publishExpiration || BigNumber.from(0),
+            subscribeExpiration: permissions?.subscribeExpiration || BigNumber.from(0),
             share: permissions?.share || false
         }
     }
@@ -132,13 +121,19 @@ export class StreamRegistry {
     // Send transactions to the StreamRegistry contract
     // --------------------------------------------------------------------------------------------
 
+    private async connectToStreamRegistryContract() {
+        if (!this.sideChainSigner || !this.streamRegistryContract) {
+            this.sideChainSigner = await this.ethereum.getSidechainSigner()
+            this.streamRegistryContract = new Contract(this.client.options.streamRegistrySidechainAddress,
+                StreamRegistryArtifact, this.sideChainSigner) as StreamRegistryContract
+        }
+    }
+
     async createStream(props?: StreamProperties): Promise<Stream> {
-        this.client.debug('createStream %o', {
-            props,
-        })
+        log('createStream %o', props)
 
         let properties = props || {}
-        await this.connectToEthereum()
+        await this.connectToStreamRegistryContract()
         const userAddress: string = (await this.ethereum.getAddress()).toLowerCase()
         // const a = this.ethereum.getAddress()
         const propsJsonStr : string = JSON.stringify(properties)
@@ -151,8 +146,8 @@ export class StreamRegistry {
             throw new ValidationError('Validation')
             // TODO add check for ENS??
         }
-        const tx = await this.streamRegistryContract?.createStream(path, propsJsonStr)
-        await tx?.wait()
+        const tx = await this.streamRegistryContract!.createStream(path, propsJsonStr)
+        await tx.wait()
         const id = userAddress + path
         properties = {
             ...properties,
@@ -162,8 +157,10 @@ export class StreamRegistry {
     }
 
     async updateStream(props?: StreamProperties): Promise<Stream> {
+        log('updateStream %o', props)
+
         let properties = props || {}
-        await this.connectToEthereum()
+        await this.connectToStreamRegistryContract()
         const userAddress: string = (await this.ethereum.getAddress()).toLowerCase()
         log('creating/registering stream onchain')
         // const a = this.ethereum.getAddress()
@@ -178,8 +175,8 @@ export class StreamRegistry {
             // TODO add check for ENS??
         }
         const id = userAddress + path
-        const tx = await this.streamRegistryContract?.updateStreamMetadata(id, propsJsonStr)
-        await tx?.wait()
+        const tx = await this.streamRegistryContract!.updateStreamMetadata(id, propsJsonStr)
+        await tx.wait()
         properties = {
             ...properties,
             id
@@ -188,40 +185,40 @@ export class StreamRegistry {
     }
 
     async grantPermission(streamId: string, operation: StreamOperation, recievingUser: string) {
-        await this.connectToEthereum()
-        const tx = await this.streamRegistryContract?.grantPermission(streamId, recievingUser,
+        await this.connectToStreamRegistryContract()
+        const tx = await this.streamRegistryContract!.grantPermission(streamId, recievingUser,
             StreamRegistry.streamOperationToSolidityType(operation))
-        await tx?.wait()
+        await tx.wait()
     }
 
     async grantPublicPermission(streamId: string, operation: StreamOperation) {
-        await this.connectToEthereum()
-        const tx = await this.streamRegistryContract?.grantPublicPermission(streamId,
+        await this.connectToStreamRegistryContract()
+        const tx = await this.streamRegistryContract!.grantPublicPermission(streamId,
             StreamRegistry.streamOperationToSolidityType(operation))
-        await tx?.wait()
+        await tx.wait()
     }
 
     async revokePermission(streamId: string, operation: StreamOperation, recievingUser: string) {
-        await this.connectToEthereum()
-        const tx = await this.streamRegistryContract?.revokePermission(streamId, recievingUser,
+        await this.connectToStreamRegistryContract()
+        const tx = await this.streamRegistryContract!.revokePermission(streamId, recievingUser,
             StreamRegistry.streamOperationToSolidityType(operation))
-        await tx?.wait()
+        await tx.wait()
     }
 
     async revokePublicPermission(streamId: string, operation: StreamOperation) {
-        await this.connectToEthereum()
-        const tx = await this.streamRegistryContract?.revokePublicPermission(streamId,
+        await this.connectToStreamRegistryContract()
+        const tx = await this.streamRegistryContract!.revokePublicPermission(streamId,
             StreamRegistry.streamOperationToSolidityType(operation))
-        await tx?.wait()
+        await tx.wait()
     }
 
     async deleteStream(streamId: string) {
-        await this.connectToEthereum()
-        const tx = await this.streamRegistryContract?.deleteStream(streamId)
-        await tx?.wait()
+        await this.connectToStreamRegistryContract()
+        const tx = await this.streamRegistryContract!.deleteStream(streamId)
+        await tx.wait()
     }
 
-    static streamOperationToSolidityType(operation: StreamOperation): BigNumber {
+    private static streamOperationToSolidityType(operation: StreamOperation): BigNumber {
         switch (operation) {
             case StreamOperation.STREAM_EDIT:
                 return BigNumber.from(0)
@@ -243,7 +240,7 @@ export class StreamRegistry {
     // GraphQL queries
     // --------------------------------------------------------------------------------------------
 
-    async queryTheGraph(gqlQuery: string): Promise<Object> {
+    private async sendStreamQuery(gqlQuery: string): Promise<Object> {
         log('GraphQL query: %s', gqlQuery)
         const res = await fetch(this.client.options.theGraphUrl, {
             method: 'POST',
@@ -267,7 +264,7 @@ export class StreamRegistry {
 
     async getStream(streamId: string): Promise<Stream> {
         log('Getting stream %s', streamId)
-        const response = await this.queryTheGraph(StreamRegistry.buildGetSingleStreamQuery(streamId)) as { stream: StreamQueryResult }
+        const response = await this.sendStreamQuery(StreamRegistry.buildGetSingleStreamQuery(streamId)) as { stream: StreamPermissionsQueryResult }
         if (!response.stream) { throw new NotFoundError('Stream not found: id=' + streamId) }
         const { id, metadata } = response.stream
         return this.parseStream(id, metadata)
@@ -275,13 +272,13 @@ export class StreamRegistry {
 
     async getAllStreams(): Promise<Stream[]> {
         log('Getting all streams from thegraph')
-        const response = await this.queryTheGraph(StreamRegistry.buildGetAllStreamsQuery()) as AllStreamsQueryResult
+        const response = await this.sendStreamQuery(StreamRegistry.buildGetAllStreamsQuery()) as AllStreamsQueryResult
         return response.streams.map(({ id, metadata }) => this.parseStream(id, metadata))
     }
 
     async getAllPermissionsForStream(streamid: string): Promise<StreamPermission[]> {
         log('Getting all permissions for stream %s', streamid)
-        const response = await this.queryTheGraph(StreamRegistry.buildGetSingleStreamQuery(streamid)) as SingleStreamQueryResult
+        const response = await this.sendStreamQuery(StreamRegistry.buildGetSingleStreamQuery(streamid)) as SingleStreamQueryResult
         if (!response.stream) {
             throw new NotFoundError('stream not found: id: ' + streamid)
         }
@@ -290,47 +287,32 @@ export class StreamRegistry {
 
     async listStreams(filter: StreamListQuery): Promise<Stream[]> {
         log('Getting all streams from thegraph that match filter %o', filter)
-        const response = await this.queryTheGraph(StreamRegistry.buildGetFilteredStreamListQuery(filter)) as FilteredStreamListQueryResult
-        return response.streams.map((streamobj) => new Stream(
-            this.client,
-            this.parseStream(streamobj.id, streamobj.metadata)
-        ))
+        const response = await this.sendStreamQuery(StreamRegistry.buildGetFilteredStreamListQuery(filter)) as FilteredStreamListQueryResult
+        return response.streams.map((streamobj) => this.parseStream(streamobj.id, streamobj.metadata))
     }
 
     async getStreamPublishers(streamId: string): Promise<EthereumAddress[]> {
         log('Getting stream publishers for stream id %s', streamId)
-        const response = await this.queryTheGraph(StreamRegistry.buildGetStreamPublishersQuery(streamId)) as StreamQueryResult
-        return response.permissions.map((permission: PermissionQueryResult) => {
-            return permission.userAddress
-        })
+        const response = await this.sendStreamQuery(StreamRegistry.buildGetStreamPublishersQuery(streamId)) as StreamPermissionsQueryResult
+        return response.permissions.map((permission) => permission.userAddress)
     }
 
     async isStreamPublisher(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
         log('Checking isStreamPublisher for stream %s for address %s', streamId, userAddress)
-        const response = await this.queryTheGraph(StreamRegistry.buildIsPublisherQuery(streamId, userAddress)) as StreamQueryResult
-        try {
-            return response.permissions.length > 0
-        } catch (error) {
-            return false
-        }
+        const response = await this.sendStreamQuery(StreamRegistry.buildIsPublisherQuery(streamId, userAddress)) as StreamPermissionsQueryResult
+        return response.permissions?.length > 0
     }
 
     async getStreamSubscribers(streamId: string): Promise<EthereumAddress[]> {
         log('Getting stream subscribers for stream id %s', streamId)
-        const result = await this.queryTheGraph(StreamRegistry.buildGetStreamSubscribersQuery(streamId)) as StreamQueryResult
-        return result.permissions.map((permission: PermissionQueryResult) => {
-            return permission.userAddress
-        })
+        const result = await this.sendStreamQuery(StreamRegistry.buildGetStreamSubscribersQuery(streamId)) as StreamPermissionsQueryResult
+        return result.permissions.map((permission) => permission.userAddress)
     }
 
     async isStreamSubscriber(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
         log('Checking isStreamSubscriber for stream %s for address %s', streamId, userAddress)
-        const response = await this.queryTheGraph(StreamRegistry.buildIsSubscriberQuery(streamId, userAddress)) as StreamQueryResult
-        try {
-            return response.permissions.length > 0
-        } catch (error) {
-            return false
-        }
+        const response = await this.sendStreamQuery(StreamRegistry.buildIsSubscriberQuery(streamId, userAddress)) as StreamPermissionsQueryResult
+        return response.permissions?.length > 0
     }
 
     // --------------------------------------------------------------------------------------------
@@ -340,7 +322,7 @@ export class StreamRegistry {
     // graphql over fetch:
     // https://stackoverflow.com/questions/44610310/node-fetch-post-request-using-graphql-query
 
-    static buildGetAllStreamsQuery(): string {
+    private static buildGetAllStreamsQuery(): string {
         //    id: "0x4178babe9e5148c6d5fd431cd72884b07ad855a0/"}) {
         const query = `{
             streams {
@@ -351,85 +333,90 @@ export class StreamRegistry {
         return JSON.stringify({ query })
     }
 
-    static buildGetSingleStreamQuery(streamid: string): string {
+    private static buildGetSingleStreamQuery(streamid: string): string {
         const query = `{
             stream (id: "${streamid}") {
-             id,
-             metadata,
-             permissions {
-               id,
-               userAddress,
-               edit,
-               canDelete,
-               publishExpiration,
-               subscribeExpiration,
-               share,
-             }
-           }
-         }`
+                id,
+                metadata,
+                permissions {
+                    id,
+                    userAddress,
+                    edit,
+                    canDelete,
+                    publishExpiration,
+                    subscribeExpiration,
+                    share,
+                }
+            }
+        }`
         return JSON.stringify({ query })
     }
 
-    static buildGetFilteredStreamListQuery(filter: StreamListQuery): string {
+    private static buildGetFilteredStreamListQuery(filter: StreamListQuery): string {
         const nameparam = filter.name ? `metadata_contains: "name\\\\\\":\\\\\\"${filter.name}"` : ''
         const maxparam = filter.max ? `, first: ${filter.max}` : ''
         const offsetparam = filter.offset ? `, skip: ${filter.offset}` : ''
         const orderByParam = filter.sortBy ? `, orderBy: ${filter.sortBy}` : ''
         const ascDescParama = filter.order ? `, orderDirection: ${filter.order}` : ''
         const query = `{
-            streams (where: {${nameparam}}${maxparam}${offsetparam}${orderByParam}${ascDescParama}) 
-              { id, metadata, permissions 
-                { id, userAddress, edit, canDelete, publishExpiration, 
-                  subscribeExpiration, share 
-                } 
-              } 
-          }`
+            streams (where: {${nameparam}}${maxparam}${offsetparam}${orderByParam}${ascDescParama}) {
+                id,
+                metadata,
+                permissions {
+                    id,
+                    userAddress,
+                    edit,
+                    canDelete,
+                    publishExpiration,
+                    subscribeExpiration,
+                    share,
+                }
+            }
+        }`
         return JSON.stringify({ query })
     }
 
-    static buildGetStreamPublishersQuery(streamId: string): string {
+    private static buildGetStreamPublishersQuery(streamId: string): string {
         const query = `{
-            stream (id: "${streamId}") 
-              { id, metadata, permissions (where: {publishExpiration_gt: "${Date.now()}"})
-                { id, userAddress, edit, canDelete, publishExpiration, 
-                  subscribeExpiration, share 
-                } 
-              } 
-          }`
-        // return JSON.stringify({ query })
+            stream (id: "${streamId}") {
+                permissions (where: {publishExpiration_gt: "${Date.now()}"}) {
+                    userAddress,
+                }
+            }
+        }`
         return JSON.stringify({ query })
     }
-    static buildIsPublisherQuery(streamId: string, userAddess: EthereumAddress): string {
+
+    private static buildIsPublisherQuery(streamId: string, userAddess: EthereumAddress): string {
         const query = `{
-            stream (id: "${streamId}")
-              { id, metadata, permissions (where: {userAddress: "${userAddess}", publishExpiration_gt: "${Date.now()}"})
-                { id, userAddress, edit, canDelete, publishExpiration, 
-                  subscribeExpiration, share 
-                } 
-              } 
-          }`
+            stream (id: "${streamId}") {
+                permissions (where: {userAddress: "${userAddess}", publishExpiration_gt: "${Date.now()}"}) {
+                    id,
+                }
+            }
+        }`
         return JSON.stringify({ query })
     }
-    static buildGetStreamSubscribersQuery(streamId: string): string {
+
+    private static buildGetStreamSubscribersQuery(streamId: string): string {
         const query = `{
-            stream (id: "${streamId}") 
-              { id, metadata, permissions (where: {subscribeExpiration_gt: "${Date.now()}"})
-                { id, userAddress, edit, canDelete, publishExpiration, 
-                  subscribeExpiration, share 
-                } 
-              } 
-          }`
+            stream (id: "${streamId}") {
+                permissions (where: {subscribeExpiration_gt: "${Date.now()}"}) {
+                    userAddress,
+                }
+            }
+        }`
         return JSON.stringify({ query })
     }
-    static buildIsSubscriberQuery(streamId: string, userAddess: EthereumAddress): string {
+
+    private static buildIsSubscriberQuery(streamId: string, userAddess: EthereumAddress): string {
         const query = `{
-            stream (id: "${streamId}") 
-              { id, metadata, permissions (where: {userAddress: "${userAddess}", subscribeExpiration_gt: "${Date.now()}"})
-                { id, userAddress, edit, canDelete, publishExpiration, 
-                  subscribeExpiration, share 
-                } 
-              } 
-          }`
+            stream (id: "${streamId}") {
+                permissions (where: {userAddress: "${userAddess}", subscribeExpiration_gt: "${Date.now()}"}) {
+                    id
+                }
+            }
+        }`
         return JSON.stringify({ query })
     }
 }

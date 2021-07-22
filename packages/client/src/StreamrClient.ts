@@ -26,6 +26,7 @@ import { GroupKey, StreamPartDefinition } from './stream'
 import { BytesLike } from '@ethersproject/bytes'
 import Contracts from './dataunion/Contracts'
 import { StreamRegistry } from './stream/StreamRegistry'
+import { NodeRegistry } from './stream/NodeRegistry'
 
 // TODO get metadata type from streamr-protocol-js project (it doesn't export the type definitions yet)
 export type OnMessageCallback = MaybeAsync<(message: any, metadata: any) => void>
@@ -44,6 +45,7 @@ interface MessageEvent {
     data: any
 }
 
+// TODO: move this somewhere else
 const balanceOfAbi = [{
     name: 'balanceOf',
     inputs: [{ type: 'address' }],
@@ -167,7 +169,7 @@ function Plugin(targetInstance: any, srcInstance: any) {
 }
 
 // these are mixed in via Plugin function above
-export interface StreamrClient extends StreamEndpoints, StreamRegistry, LoginEndpoints, Publisher, Subscriber {}
+export interface StreamrClient extends StreamEndpoints, StreamRegistry, NodeRegistry, LoginEndpoints, Publisher, Subscriber {}
 
 /**
  * @category Important
@@ -231,6 +233,7 @@ export class StreamrClient extends EventEmitter { // eslint-disable-line no-rede
         Plugin(this, new StreamEndpoints(this))
         Plugin(this, new LoginEndpoints(this))
         Plugin(this, new StreamRegistry(this))
+        Plugin(this, new NodeRegistry(this))
         this.cached = new StreamrCached(this)
     }
 

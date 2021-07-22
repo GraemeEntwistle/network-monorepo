@@ -1,8 +1,3 @@
-import fetch from 'node-fetch'
-import { getAddress } from '@ethersproject/address'
-import { getEndpointUrl, until } from '../utils'
-import authFetch from '../rest/authFetch'
-
 export { GroupKey } from './encryption/Encryption'
 
 import { StorageNode } from './StorageNode'
@@ -106,6 +101,14 @@ class StreamrStream {
         await this._client.updateStream(this.toObject())
     }
 
+    async delete() {
+        await this._client.deleteStream(this.id)
+    }
+
+    async publish(content: object, timestamp?: number|string|Date, partitionKey?: string) {
+        return this._client.publish(this.id, content, timestamp, partitionKey)
+    }
+
     /** @internal */
     toObject() {
         const result = {}
@@ -118,8 +121,32 @@ class StreamrStream {
         return result
     }
 
-    async delete() {
-        await this._client.deleteStream(this.id)
+    async detectFields() {
+        // Get last message of the stream to be used for field detecting
+        const sub = await this._client.resend({
+            stream: this.id,
+            resend: {
+                last: 1,
+            },
+        })
+
+        const receivedMsgs = await sub.collect()
+
+        if (!receivedMsgs.length) { return }
+
+        const [lastMessage] = receivedMsgs
+
+        const fields = Object.entries(lastMessage).map(([name, value]) => {
+            const type = getFieldType(value)
+            return !!type && {
+                name,
+                type,
+            }
+        }).filter(Boolean) as Field[] // see https://github.com/microsoft/TypeScript/issues/30621
+
+        // Save field config back to the stream
+        this.config.fields = fields
+        await this.update()
     }
 
     async getPermissions() {
@@ -158,98 +185,23 @@ class StreamrStream {
         await this._client.revokePublicPermission(this.id, operation)
     }
 
-    async detectFields() {
-        // Get last message of the stream to be used for field detecting
-        const sub = await this._client.resend({
-            stream: this.id,
-            resend: {
-                last: 1,
-            },
-        })
-
-        const receivedMsgs = await sub.collect()
-
-        if (!receivedMsgs.length) { return }
-
-        const [lastMessage] = receivedMsgs
-
-        const fields = Object.entries(lastMessage).map(([name, value]) => {
-            const type = getFieldType(value)
-            return !!type && {
-                name,
-                type,
-            }
-        }).filter(Boolean) as Field[] // see https://github.com/microsoft/TypeScript/issues/30621
-
-        // Save field config back to the stream
-        this.config.fields = fields
-        await this.update()
+    async addToStorageNode(node: StorageNode | EthereumAddress) {
+        // @ts-ignore
+        await this._client.addStreamToStorageNode(this.id, node.address || node)
     }
 
-    async addToStorageNode(node: StorageNode|EthereumAddress, {
-        timeout = 30000,
-        pollInterval = 200
-    }: {
-        timeout?: number,
-        pollInterval?: number
-    } = {}) {
-        const address = (node instanceof StorageNode) ? node.getAddress() : node
-        // currently we support only one storage node
-        // -> we can validate that the given address is that address
-        // -> remove this comparison when we start to support multiple storage nodes
-        if (getAddress(address) !== this._client.options.storageNode.address) {
-            throw new Error('Unknown storage node: ' + address)
-        }
-
-        await authFetch(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'storageNodes'),
-            this._client.session, {
-                method: 'POST',
-                body: JSON.stringify({
-                    address
-                })
-            },
-        )
-        // wait for propagation: the storage node sees the database change in E&E and
-        // is ready to store the any stream data which we publish
-        await until(() => this.isStreamStoredInStorageNode(this.id), timeout, pollInterval, () => (
-            `Propagation timeout when adding stream to a storage node: ${this.id}`
-        ))
+    async removeFromStorageNode(node: StorageNode | EthereumAddress) {
+        // @ts-ignore
+        return this._client.removeStreamFromStorageNode(this.id, node.address || node)
     }
 
-    private async isStreamStoredInStorageNode(streamId: string) {
-        const url = `${this._client.options.storageNode.url}/api/v1/streams/${encodeURIComponent(streamId)}/storage/partitions/0`
-        const response = await fetch(url)
-        if (response.status === 200) {
-            return true
-        }
-        if (response.status === 404) { // eslint-disable-line padding-line-between-statements
-            return false
-        }
-        throw new Error(`Unexpected response code ${response.status} when fetching stream storage status`)
-    }
-
-    async removeFromStorageNode(node: StorageNode|EthereumAddress) {
-        const address = (node instanceof StorageNode) ? node.getAddress() : node
-        await authFetch(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'storageNodes', address),
-            this._client.session,
-            {
-                method: 'DELETE'
-            },
-        )
+    private async isStreamStoredInStorageNode(node: StorageNode | EthereumAddress) {
+        // @ts-ignore
+        return this._client.isStreamStoredInStorageNode(this.id, node.address || node)
     }
 
     async getStorageNodes() {
-        const json = await authFetch<{ storageNodeAddress: string}[] >(
-            getEndpointUrl(this._client.options.restUrl, 'streams', this.id, 'storageNodes'),
-            this._client.session,
-        )
-        return json.map((item: any) => new StorageNode(item.storageNodeAddress))
-    }
-
-    async publish(content: object, timestamp?: number|string|Date, partitionKey?: string) {
-        return this._client.publish(this.id, content, timestamp, partitionKey)
+        return this._client.getAllStorageNodes()
     }
 }
 
