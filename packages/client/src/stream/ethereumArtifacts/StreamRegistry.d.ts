@@ -29,6 +29,7 @@ interface StreamRegistryInterface extends ethers.utils.Interface {
     "createStream(string,string)": FunctionFragment;
     "createStreamWithENS(string,string,string)": FunctionFragment;
     "deleteStream(string)": FunctionFragment;
+    "exists(string)": FunctionFragment;
     "getAddressKey(string,address)": FunctionFragment;
     "getDirectPermissionsForUser(string,address)": FunctionFragment;
     "getPermissionsForUser(string,address)": FunctionFragment;
@@ -88,6 +89,7 @@ interface StreamRegistryInterface extends ethers.utils.Interface {
     functionFragment: "deleteStream",
     values: [string]
   ): string;
+  encodeFunctionData(functionFragment: "exists", values: [string]): string;
   encodeFunctionData(
     functionFragment: "getAddressKey",
     values: [string, string]
@@ -246,6 +248,7 @@ interface StreamRegistryInterface extends ethers.utils.Interface {
     functionFragment: "deleteStream",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "exists", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getAddressKey",
     data: BytesLike
@@ -474,6 +477,13 @@ export class StreamRegistry extends Contract {
       streamId: string,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
+
+    exists(streamId: string, overrides?: CallOverrides): Promise<[boolean]>;
+
+    "exists(string)"(
+      streamId: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
     getAddressKey(
       streamId: string,
@@ -982,6 +992,13 @@ export class StreamRegistry extends Contract {
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
+  exists(streamId: string, overrides?: CallOverrides): Promise<boolean>;
+
+  "exists(string)"(
+    streamId: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
   getAddressKey(
     streamId: string,
     user: string,
@@ -1445,6 +1462,13 @@ export class StreamRegistry extends Contract {
       streamId: string,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    exists(streamId: string, overrides?: CallOverrides): Promise<boolean>;
+
+    "exists(string)"(
+      streamId: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     getAddressKey(
       streamId: string,
@@ -1979,6 +2003,13 @@ export class StreamRegistry extends Contract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
+    exists(streamId: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "exists(string)"(
+      streamId: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     getAddressKey(
       streamId: string,
       user: string,
@@ -2409,6 +2440,16 @@ export class StreamRegistry extends Contract {
     "deleteStream(string)"(
       streamId: string,
       overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    exists(
+      streamId: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "exists(string)"(
+      streamId: string,
+      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     getAddressKey(

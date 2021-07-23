@@ -10,7 +10,7 @@ import { pTimeout, counterId, CounterId, AggregatedError, pLimitFn } from '../sr
 import { Debug, inspect, format } from '../src/utils/log'
 import { MaybeAsync } from '../src/types'
 import { validateOptions } from '../src/stream/utils'
-import type { StreamPartDefinitionOptions, StreamProperties } from '../src/stream'
+import type { Stream, StreamPartDefinitionOptions, StreamProperties } from '../src/stream'
 import { StreamrClient } from '../src/StreamrClient'
 import clientOptions from './integration/config'
 
@@ -395,7 +395,7 @@ export const createRelativeTestStreamId = (module: NodeModule, suffix?: string) 
 }
 
 // eslint-disable-next-line no-undef
-export const createTestStream = (streamrClient: StreamrClient, module: NodeModule, props?: Partial<StreamProperties>) => {
+export const createTestStream = async (streamrClient: StreamrClient, module: NodeModule, props?: Partial<StreamProperties>): Promise<Stream> => {
     return streamrClient.createStream({
         id: createRelativeTestStreamId(module),
         ...props

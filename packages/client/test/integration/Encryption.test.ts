@@ -8,7 +8,8 @@ import { Stream, StreamOperation } from '../../src/stream'
 import Connection from '../../src/Connection'
 import { StorageNode } from '../../src/stream/StorageNode'
 
-import clientOptions from './config'
+// import clientOptions from './config'
+import config from './config'
 
 const debug = Debug('StreamrClient::test')
 const TIMEOUT = 15 * 1000
@@ -31,7 +32,7 @@ describeRepeats('decryption', () => {
         const c = new StreamrClient({
             ...clientOptions,
             auth: {
-                privateKey: fakePrivateKey(),
+                privateKey: config.auth.privateKey,
             },
             autoConnect: false,
             autoDisconnect: false,

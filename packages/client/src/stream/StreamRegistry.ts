@@ -218,6 +218,12 @@ export class StreamRegistry {
         await tx.wait()
     }
 
+    async streamExists(streamId: string): Promise<boolean> {
+        log('Checking if stream exists %s', streamId)
+        this.connectToStreamRegistryContract()
+        return this.streamRegistryContract!.exists(streamId)
+    }
+
     private static streamOperationToSolidityType(operation: StreamOperation): BigNumber {
         switch (operation) {
             case StreamOperation.STREAM_EDIT:
@@ -250,7 +256,13 @@ export class StreamRegistry {
             },
             body: gqlQuery
         })
-        const resJson = await res.json()
+        const resText = await res.text()
+        let resJson
+        try {
+            resJson = JSON.parse(resText)
+        } catch {
+            throw new Error(`GraphQL query failed with "${resText}", check that your theGraphUrl="${this.client.options.theGraphUrl}" is correct`)
+        }
         log('GraphQL response: %o', resJson)
         if (!resJson.data) {
             if (resJson.errors && resJson.errors.length > 0) {
@@ -293,26 +305,38 @@ export class StreamRegistry {
 
     async getStreamPublishers(streamId: string): Promise<EthereumAddress[]> {
         log('Getting stream publishers for stream id %s', streamId)
-        const response = await this.sendStreamQuery(StreamRegistry.buildGetStreamPublishersQuery(streamId)) as StreamPermissionsQueryResult
-        return response.permissions.map((permission) => permission.userAddress)
+        const response = await this.sendStreamQuery(StreamRegistry.buildGetStreamPublishersQuery(streamId)) as SingleStreamQueryResult
+        if (!response.stream) {
+            throw new NotFoundError('stream not found: id: ' + streamId)
+        }
+        return response.stream.permissions.map((permission) => permission.userAddress)
     }
 
     async isStreamPublisher(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
         log('Checking isStreamPublisher for stream %s for address %s', streamId, userAddress)
-        const response = await this.sendStreamQuery(StreamRegistry.buildIsPublisherQuery(streamId, userAddress)) as StreamPermissionsQueryResult
-        return response.permissions?.length > 0
+        const response = await this.sendStreamQuery(StreamRegistry.buildIsPublisherQuery(streamId, userAddress)) as SingleStreamQueryResult
+        if (!response.stream) {
+            throw new NotFoundError('stream not found: id: ' + streamId)
+        }
+        return response.stream.permissions?.length > 0
     }
 
     async getStreamSubscribers(streamId: string): Promise<EthereumAddress[]> {
         log('Getting stream subscribers for stream id %s', streamId)
-        const result = await this.sendStreamQuery(StreamRegistry.buildGetStreamSubscribersQuery(streamId)) as StreamPermissionsQueryResult
-        return result.permissions.map((permission) => permission.userAddress)
+        const response = await this.sendStreamQuery(StreamRegistry.buildGetStreamSubscribersQuery(streamId)) as SingleStreamQueryResult
+        if (!response.stream) {
+            throw new NotFoundError('stream not found: id: ' + streamId)
+        }
+        return response.stream.permissions.map((permission) => permission.userAddress)
     }
 
     async isStreamSubscriber(streamId: string, userAddress: EthereumAddress): Promise<boolean> {
         log('Checking isStreamSubscriber for stream %s for address %s', streamId, userAddress)
-        const response = await this.sendStreamQuery(StreamRegistry.buildIsSubscriberQuery(streamId, userAddress)) as StreamPermissionsQueryResult
-        return response.permissions?.length > 0
+        const response = await this.sendStreamQuery(StreamRegistry.buildIsSubscriberQuery(streamId, userAddress)) as SingleStreamQueryResult
+        if (!response.stream) {
+            throw new NotFoundError('stream not found: id: ' + streamId)
+        }
+        return response.stream.permissions?.length > 0
     }
 
     // --------------------------------------------------------------------------------------------
