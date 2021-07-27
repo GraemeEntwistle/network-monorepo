@@ -10,7 +10,8 @@
             "request": "launch",
             "name": "Jest single test",
             "program": "${workspaceRoot}/node_modules/jest/bin/jest.js",
-            "env": { "CI": "true", "STREAMR_DOCKER_DEV_HOST": "192.168.2.112" },
+            // "env": { "CI": "true", "STREAMR_DOCKER_DEV_HOST": "192.168.2.112" },
+            "env": { "CI": "true", "STREAMR_DOCKER_DEV_HOST": "localhost" },
             "args": [
             //   "-c",
             //   "./config/test/jest.json",
@@ -18,7 +19,8 @@
               "-i",
               "--no-cache",
               // "test/integration/Stream.test.ts"
-              "test/integration/StreamEndpoints.test.ts"
+              // "test/integration/StreamEndpoints.test.ts"
+              "test/integration/NodeEndpoints.test.ts"
             ],
             "cwd": "${workspaceRoot}",
             "protocol": "inspector",

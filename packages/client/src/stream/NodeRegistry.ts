@@ -33,6 +33,9 @@ type StoredStreamQueryResult = {
 type AllNodesQueryResult = {
     nodes: [NodeQueryResult],
 }
+type SingleNodeQueryResult = {
+    node: NodeQueryResult,
+}
 
 type StorageNodeQueryResult = {
     node: {
@@ -93,7 +96,7 @@ export class NodeRegistry {
         log('setNode %s -> %s', nodeAddress, nodeUrl)
         await this.connectToNodeRegistryContract()
 
-        const tx = await this.nodeRegistryContract!.createOrUpdateNode(nodeAddress, nodeUrl)
+        const tx = await this.nodeRegistryContract!.createOrUpdateNodeSelf(nodeUrl)
         await tx.wait()
         return new StorageNode(nodeAddress, nodeUrl)
     }
@@ -125,6 +128,12 @@ export class NodeRegistry {
     // --------------------------------------------------------------------------------------------
     // GraphQL queries
     // --------------------------------------------------------------------------------------------
+
+    async getNode(nodeAddress: string): Promise<StorageNode> {
+        log('getnode %s ', nodeAddress)
+        const res = await this.sendNodeQuery(NodeRegistry.buildGetNodeQuery(nodeAddress.toLowerCase())) as SingleNodeQueryResult
+        return new StorageNode(res.node.id, res.node.metadata)
+    }
 
     async isStreamStoredInStorageNode(streamId: string, nodeAddress: string): Promise<boolean> {
         log('Checking if stream %s is stored in storage node %s', streamId, nodeAddress)
@@ -182,6 +191,17 @@ export class NodeRegistry {
     private static buildAllNodesQuery(): string {
         const query = `{
             nodes {
+                id,
+                metadata,
+                lastSeen
+            }
+        }`
+        return JSON.stringify({ query })
+    }
+
+    private static buildGetNodeQuery(nodeAddress: string): string {
+        const query = `{
+            node (id: "${nodeAddress}") {
                 id,
                 metadata,
                 lastSeen

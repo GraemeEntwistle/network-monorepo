@@ -185,6 +185,7 @@ export class StreamRegistry {
     }
 
     async grantPermission(streamId: string, operation: StreamOperation, recievingUser: string) {
+        log('Granting Permission %o for user %s on stream %s', operation, recievingUser, streamId)
         await this.connectToStreamRegistryContract()
         const tx = await this.streamRegistryContract!.grantPermission(streamId, recievingUser,
             StreamRegistry.streamOperationToSolidityType(operation))
@@ -192,6 +193,7 @@ export class StreamRegistry {
     }
 
     async grantPublicPermission(streamId: string, operation: StreamOperation) {
+        log('Granting PUBLIC Permission %o on stream %s', operation, streamId)
         await this.connectToStreamRegistryContract()
         const tx = await this.streamRegistryContract!.grantPublicPermission(streamId,
             StreamRegistry.streamOperationToSolidityType(operation))
@@ -199,6 +201,7 @@ export class StreamRegistry {
     }
 
     async revokePermission(streamId: string, operation: StreamOperation, recievingUser: string) {
+        log('Revoking Permission %o for user %s on stream %s', operation, recievingUser, streamId)
         await this.connectToStreamRegistryContract()
         const tx = await this.streamRegistryContract!.revokePermission(streamId, recievingUser,
             StreamRegistry.streamOperationToSolidityType(operation))
@@ -206,6 +209,7 @@ export class StreamRegistry {
     }
 
     async revokePublicPermission(streamId: string, operation: StreamOperation) {
+        log('Revoking PUBLIC Permission %o on stream %s', operation, streamId)
         await this.connectToStreamRegistryContract()
         const tx = await this.streamRegistryContract!.revokePublicPermission(streamId,
             StreamRegistry.streamOperationToSolidityType(operation))
@@ -213,6 +217,7 @@ export class StreamRegistry {
     }
 
     async deleteStream(streamId: string) {
+        log('Deleting stream %s', streamId)
         await this.connectToStreamRegistryContract()
         const tx = await this.streamRegistryContract!.deleteStream(streamId)
         await tx.wait()
