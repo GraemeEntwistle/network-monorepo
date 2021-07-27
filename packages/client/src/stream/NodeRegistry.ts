@@ -13,6 +13,7 @@ import fetch from 'node-fetch'
 import { EthereumAddress } from '../types'
 import { StorageNode } from './StorageNode'
 import { StreamRegistry, StreamQueryResult } from './StreamRegistry'
+import { NotFoundError } from '../rest/authFetch'
 
 const log = debug('StreamrClient:NodeRegistry')
 
@@ -75,7 +76,7 @@ export class NodeRegistry {
 
     async isStreamStoredInStorageNodeFromContract(streamId: string, nodeAddress: string): Promise<boolean> {
         log('Checking if stream %s is stored in storage node %s', streamId, nodeAddress)
-        return this.streamStorageRegistryContractReadonly.isStorageNodeOf(streamId, nodeAddress)
+        return this.streamStorageRegistryContractReadonly.isStorageNodeOf(streamId, nodeAddress.toLowerCase())
     }
 
     // --------------------------------------------------------------------------------------------
@@ -92,20 +93,20 @@ export class NodeRegistry {
         }
     }
 
-    async setNode(nodeAddress: string, nodeUrl: string): Promise<StorageNode> {
-        log('setNode %s -> %s', nodeAddress, nodeUrl)
+    async setNode(nodeUrl: string): Promise<StorageNode> {
+        log('setNode %s -> %s', nodeUrl)
         await this.connectToNodeRegistryContract()
 
         const tx = await this.nodeRegistryContract!.createOrUpdateNodeSelf(nodeUrl)
         await tx.wait()
-        return new StorageNode(nodeAddress, nodeUrl)
+        return new StorageNode(await this.client.getAddress(), nodeUrl)
     }
 
-    async removeNode(nodeAddress: string): Promise<void> {
-        log('removeNode %s', nodeAddress)
+    async removeNode(): Promise<void> {
+        log('removeNode called')
         await this.connectToNodeRegistryContract()
 
-        const tx = await this.nodeRegistryContract!.removeNode(nodeAddress)
+        const tx = await this.nodeRegistryContract!.removeNodeSelf()
         await tx.wait()
     }
 
@@ -129,15 +130,18 @@ export class NodeRegistry {
     // GraphQL queries
     // --------------------------------------------------------------------------------------------
 
-    async getNode(nodeAddress: string): Promise<StorageNode> {
+    async getNode(nodeAddress: string): Promise<StorageNode | null> {
         log('getnode %s ', nodeAddress)
         const res = await this.sendNodeQuery(NodeRegistry.buildGetNodeQuery(nodeAddress.toLowerCase())) as SingleNodeQueryResult
-        return new StorageNode(res.node.id, res.node.metadata)
+        return res.node === null ? null : new StorageNode(res.node.id, res.node.metadata)
     }
 
     async isStreamStoredInStorageNode(streamId: string, nodeAddress: string): Promise<boolean> {
         log('Checking if stream %s is stored in storage node %s', streamId, nodeAddress)
-        const res = await this.sendNodeQuery(NodeRegistry.buildStorageNodeQuery(nodeAddress)) as StorageNodeQueryResult
+        const res = await this.sendNodeQuery(NodeRegistry.buildStorageNodeQuery(nodeAddress.toLowerCase())) as StorageNodeQueryResult
+        if (res.node === null) {
+            throw new NotFoundError('Node not found, id: ' + nodeAddress)
+        }
         return res.node.storedStreams.find((stream) => stream.id === streamId) !== undefined
     }
 
@@ -149,7 +153,7 @@ export class NodeRegistry {
 
     async getStoredStreamsOf(nodeAddress: string): Promise<Stream[]> {
         log('Getting stored streams of node %s', nodeAddress)
-        const res = await this.sendNodeQuery(NodeRegistry.buildStorageNodeQuery(nodeAddress)) as StorageNodeQueryResult
+        const res = await this.sendNodeQuery(NodeRegistry.buildStorageNodeQuery(nodeAddress.toLowerCase())) as StorageNodeQueryResult
         return res.node.storedStreams.map((stream) => StreamRegistry.parseStreamFromProps(this.client, stream.id, stream.metadata))
     }
 

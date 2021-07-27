@@ -1,11 +1,11 @@
 import { Wallet } from '@ethersproject/wallet'
 import debug from 'debug'
 import { EthereumAddress } from '../../src'
-import { Stream, StreamOperation } from '../../src/stream'
+import { Stream } from '../../src/stream'
 import { StorageNode } from '../../src/stream/StorageNode'
 import { StreamrClient } from '../../src/StreamrClient'
 import { until } from '../../src/utils'
-import { uid, fakeAddress, getNewProps, createTestStream } from '../utils'
+import { createTestStream } from '../utils'
 // import { id } from '@ethersproject/hash'
 
 import config from './config'
@@ -19,9 +19,9 @@ const log = debug('StreamrClient::NodeEndpointsIntegrationTest')
 
 let client: StreamrClient
 let wallet: Wallet
-// let createdStream: Stream
-// let createdNode: StorageNode
-const nodeAddress: EthereumAddress = fakeAddress()
+let createdStream: Stream
+let createdNode: StorageNode
+let nodeAddress: EthereumAddress
 const nodeUrl = 'http://a.a'
 
 const createClient = (opts = {}) => new StreamrClient({
@@ -31,45 +31,109 @@ const createClient = (opts = {}) => new StreamrClient({
     ...opts,
 } as any)
 
-beforeAll(() => {
+beforeAll(async () => {
     const key = config.auth.privateKey
     // const hash = id(`marketplace-contracts${1}`)
     // return new Wallet(hash, provider)
-    wallet = new Wallet(key)
     client = createClient({ auth: {
         privateKey: key
     } })
+    nodeAddress = await client.getAddress()
+    createdStream = await createTestStream(client, module, {})
+    return until(async () => {
+        try {
+            return client.streamExists(createdStream.id)
+        } catch (err) {
+            log('stream not found yet %o', err)
+            return false
+        }
+    }, 100000, 1000)
 })
-
-// beforeAll(async () => {
-//     createdNode = await create(client, module, {
-//         name: getName()
-//     })
-//     return until(async () => {
-//         try {
-//             return client.streamExists(createdStream.id)
-//         } catch (err) {
-//             log('stream not found yet %o', err)
-//             return false
-//         }
-//     }, 100000, 1000)
-// })
 
 describe('createNode', () => {
     it('creates a node ', async () => {
-        const newNode: StorageNode = await client.setNode(nodeAddress, nodeUrl)
+        createdNode = await client.setNode(nodeUrl)
         await until(async () => {
             try {
-                const addr = await client.getAddress()
-                const node = await client.getNode(addr)
-                return typeof node !== 'undefined'
+                return (await client.getNode(nodeAddress)) !== null
             } catch (err) {
                 log('node not found yet %o', err)
                 return false
             }
         }, 100000, 1000)
-        expect(newNode.address).toEqual(nodeAddress)
-        return expect(newNode.url).toEqual(nodeUrl)
+        expect(createdNode.address).toEqual(nodeAddress)
+        return expect(createdNode.url).toEqual(nodeUrl)
+    })
+
+    it('addStreamToStorageNode, isStreamStoredInStorageNode', async () => {
+        await client.addStreamToStorageNode(createdStream.id, nodeAddress)
+        await until(async () => {
+            try {
+                return await client.isStreamStoredInStorageNode(createdStream.id, nodeAddress)
+            } catch (err) {
+                log('stream still not added to node %o', err)
+                return false
+            }
+        }, 100000, 1000)
+        return expect(await client.isStreamStoredInStorageNode(createdStream.id, nodeAddress)).toEqual(true)
+    })
+
+    it('getStorageNodesOf', async () => {
+        const storageNodes: StorageNode[] = await client.getStorageNodesOf(createdStream.id)
+        expect(storageNodes.length).toEqual(1)
+        return expect(storageNodes[0].address).toEqual(nodeAddress.toLowerCase())
+    })
+
+    it('getStoredStreamsOf', async () => {
+        const streams: Stream[] = await client.getStoredStreamsOf(nodeAddress)
+        expect(streams.length).toEqual(1)
+        return expect(streams[0].id).toEqual(createdStream.id)
+    })
+
+    it('getAllStorageNodes', async () => {
+        const storageNodes: StorageNode[] = await client.getAllStorageNodes()
+        expect(storageNodes.length).toEqual(1)
+        return expect(storageNodes[0].address).toEqual(nodeAddress.toLowerCase())
+    })
+
+    it('removeStreamFromStorageNode', async () => {
+        await client.removeStreamFromStorageNode(createdStream.id, nodeAddress)
+        await until(async () => {
+            try {
+                return !(await client.isStreamStoredInStorageNode(createdStream.id, nodeAddress))
+            } catch (err) {
+                log('stream still not added to node %o', err)
+                return false
+            }
+        }, 100000, 1000)
+        return expect(await client.isStreamStoredInStorageNode(createdStream.id, nodeAddress)).toEqual(false)
+    })
+
+    it('addStreamToStorageNode through streamobject', async () => {
+        await createdStream.addToStorageNode(nodeAddress)
+        await until(async () => {
+            try {
+                return await client.isStreamStoredInStorageNode(createdStream.id, nodeAddress)
+            } catch (err) {
+                log('stream still not added to node %o', err)
+                return false
+            }
+        }, 100000, 1000)
+        return expect(await client.isStreamStoredInStorageNode(createdStream.id, nodeAddress)).toEqual(true)
+    })
+
+    it('delete a node ', async () => {
+        await client.removeNode()
+        await until(async () => {
+            try {
+                const res = await client.getNode(nodeAddress)
+                return res === null
+            } catch (err) {
+                log('node still there after being deleted %o', err)
+                return false
+            }
+        }, 100000, 1000)
+        return expect(await client.getNode(nodeAddress)).toEqual(null)
     })
 })
 
