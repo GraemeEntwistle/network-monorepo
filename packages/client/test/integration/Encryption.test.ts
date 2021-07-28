@@ -1,7 +1,7 @@
 import { wait } from 'streamr-test-utils'
 import { BroadcastMessage, ControlMessageType, StreamMessage } from 'streamr-client-protocol'
 import { describeRepeats, fakePrivateKey, Msg, getPublishTestMessages, createRelativeTestStreamId, Debug } from '../utils'
-import { Defer } from '../../src/utils'
+import { Defer, until } from '../../src/utils'
 import { StreamrClient } from '../../src/StreamrClient'
 import { GroupKey } from '../../src/stream/encryption/Encryption'
 import { Stream, StreamOperation } from '../../src/stream'
@@ -9,6 +9,7 @@ import Connection from '../../src/Connection'
 import { StorageNode } from '../../src/stream/StorageNode'
 
 import clientOptions from './config'
+import { EthereumAddress } from '..'
 
 const debug = Debug('StreamrClient::test')
 const TIMEOUT = 15 * 1000
@@ -27,6 +28,7 @@ describeRepeats('decryption', () => {
     let publisher: StreamrClient
     let subscriber: StreamrClient
     let stream: Stream
+    let nodeAddress: EthereumAddress
 
     const createClient = (opts = {}) => {
         const c = new StreamrClient({
@@ -110,14 +112,21 @@ describeRepeats('decryption', () => {
         return client
     }
 
-    async function setupStream() {
+    async function setupStreamAndNodes() {
+        nodeAddress = await publisher.getAddress()
         stream = await publisher.createStream({
-            id: createRelativeTestStreamId(module),
-            requireEncryptedData: true,
+            id: createRelativeTestStreamId(module)
         })
-
-        await stream.addToStorageNode(StorageNode.STREAMR_DOCKER_DEV)
-
+        await publisher.setNode(nodeAddress)
+        await stream.addToStorageNode(nodeAddress)
+        await until(async () => {
+            try {
+                return publisher.isStreamStoredInStorageNode(stream.id, nodeAddress)
+            } catch (err) {
+                debug('stream not found yet %o', err)
+                return false
+            }
+        }, 100000, 1000)
         publishTestMessages = getPublishTestMessages(publisher, {
             stream
         })
@@ -149,12 +158,13 @@ describeRepeats('decryption', () => {
     }
 
     describe('using default config', () => {
+
         beforeEach(async () => {
             await setupPublisherSubscriberClients()
         })
 
         beforeEach(async () => {
-            await setupStream()
+            await setupStreamAndNodes()
         })
 
         describe('subscriber has permissions', () => {

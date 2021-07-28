@@ -18,7 +18,6 @@ const log = debug('StreamrClient::NodeEndpointsIntegrationTest')
  */
 
 let client: StreamrClient
-let wallet: Wallet
 let createdStream: Stream
 let createdNode: StorageNode
 let nodeAddress: EthereumAddress
@@ -86,7 +85,7 @@ describe('createNode', () => {
 
     it('getStoredStreamsOf', async () => {
         const streams: Stream[] = await client.getStoredStreamsOf(nodeAddress)
-        expect(streams.length).toEqual(1)
+        expect(streams.length).toBeGreaterThan(0)
         return expect(streams[0].id).toEqual(createdStream.id)
     })
 
