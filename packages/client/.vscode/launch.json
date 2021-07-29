@@ -21,7 +21,8 @@
               // "test/integration/Stream.test.ts"
               // "test/integration/StreamEndpoints.test.ts"
               // "test/integration/NodeEndpoints.test.ts"
-              "test/integration/Encryption.test.ts"
+              // "test/integration/Encryption.test.ts"
+              "test/integration/MultipleClients.test.js"
             ],
             "cwd": "${workspaceRoot}",
             "protocol": "inspector",

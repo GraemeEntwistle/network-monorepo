@@ -121,7 +121,7 @@ describeRepeats('decryption', () => {
         await stream.addToStorageNode(nodeAddress)
         await until(async () => {
             try {
-                return publisher.isStreamStoredInStorageNode(stream.id, nodeAddress)
+                return await publisher.isStreamStoredInStorageNode(stream.id, nodeAddress)
             } catch (err) {
                 debug('stream not found yet %o', err)
                 return false
@@ -152,9 +152,9 @@ describeRepeats('decryption', () => {
     }
 
     async function grantSubscriberPermissions({ stream: s = stream, client: c = subscriber }: { stream?: Stream, client?: StreamrClient } = {}) {
-        const p1 = await s.grantPermission(StreamOperation.STREAM_GET, await c.getPublisherId())
+        // const p1 = await s.grantPermission(StreamOperation.STREAM_GET, await c.getPublisherId())
         const p2 = await s.grantPermission(StreamOperation.STREAM_SUBSCRIBE, await c.getPublisherId())
-        return [p1, p2]
+        return [p2]
     }
 
     describe('using default config', () => {
@@ -201,7 +201,6 @@ describeRepeats('decryption', () => {
                     done,
                 ])
             })
-        })
 
     //         it('client.subscribe can get the group key and decrypt encrypted message using an RSA key pair', async () => {
     //             const done = Defer()
@@ -326,7 +325,6 @@ describeRepeats('decryption', () => {
     //         it('does not encrypt messages in stream without groupkey', async () => {
     //             const stream2 = await publisher.createStream({
     //                 id: createRelativeTestStreamId(module),
-    //                 requireEncryptedData: false,
     //             })
 
     //             let didFindStream2 = false
@@ -680,7 +678,6 @@ describeRepeats('decryption', () => {
     //     it('does encrypt messages in stream that does not require encryption but groupkey is set anyway', async () => {
     //         const stream2 = await publisher.createStream({
     //             id: createRelativeTestStreamId(module),
-    //             requireEncryptedData: false,
     //         })
 
     //         let didFindStream2 = false
@@ -746,7 +743,6 @@ describeRepeats('decryption', () => {
     //     it('sets group key per-stream', async () => {
     //         const stream2 = await publisher.createStream({
     //             id: createRelativeTestStreamId(module),
-    //             requireEncryptedData: true,
     //         })
 
     //         const groupKey = GroupKey.generate()
@@ -841,8 +837,8 @@ describeRepeats('decryption', () => {
 
     //         await publisher.rotateGroupKey(stream.id)
 
-    //         await stream.grantPermission(StreamOperation.STREAM_GET, await subscriber.getPublisherId())
-    //         const subPermission = await stream.grantPermission(StreamOperation.STREAM_SUBSCRIBE, await subscriber.getPublisherId())
+    //         // await stream.grantPermission(StreamOperation.STREAM_GET, await subscriber.getPublisherId())
+    //         await stream.grantPermission(StreamOperation.STREAM_SUBSCRIBE, await subscriber.getPublisherId())
 
     //         const sub = await subscriber.subscribe({
     //             stream: stream.id,
@@ -868,7 +864,7 @@ describeRepeats('decryption', () => {
     //                 publisher.debug('PUBLISHED %d of %d', count, maxMessages)
     //                 if (count === revokeAfter) {
     //                     await gotMessages
-    //                     await stream.revokePermission(subPermission.id)
+    //                     await stream.revokePermission(StreamOperation.STREAM_SUBSCRIBE, await subscriber.getPublisherId())
     //                     await publisher.rekey(stream.id)
     //                 }
     //             }
@@ -921,7 +917,7 @@ describeRepeats('decryption', () => {
     //             })
     //         })
     //         beforeEach(async () => {
-    //             await setupStream()
+    //             await setupStreamAndNodes()
     //         })
     //         it('fails gracefully if permission revoked after first message', async () => {
     //             await testRevokeDuringSubscribe({ maxMessages: 6, revokeAfter: 1 })
@@ -941,7 +937,7 @@ describeRepeats('decryption', () => {
     //         })
 
     //         beforeEach(async () => {
-    //             await setupStream()
+    //             await setupStreamAndNodes()
     //         })
 
     //         it('fails gracefully if permission revoked after first message', async () => {
@@ -951,6 +947,6 @@ describeRepeats('decryption', () => {
     //         it('fails gracefully if permission revoked after some messages', async () => {
     //             await testRevokeDuringSubscribe({ maxMessages: 6, revokeAfter: 3 })
     //         })
-    //     })
+        })
     })
 })

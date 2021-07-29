@@ -41,7 +41,7 @@ beforeAll(async () => {
     createdStream = await createTestStream(client, module, {})
     return until(async () => {
         try {
-            return client.streamExists(createdStream.id)
+            return await client.streamExists(createdStream.id)
         } catch (err) {
             log('stream not found yet %o', err)
             return false
@@ -86,7 +86,7 @@ describe('createNode', () => {
     it('getStoredStreamsOf', async () => {
         const streams: Stream[] = await client.getStoredStreamsOf(nodeAddress)
         expect(streams.length).toBeGreaterThan(0)
-        return expect(streams[0].id).toEqual(createdStream.id)
+        return expect(streams.find((el) => { return el.id === createdStream.id })).toBeDefined()
     })
 
     it('getAllStorageNodes', async () => {

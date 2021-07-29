@@ -5,13 +5,14 @@ import Connection from '../../src/Connection'
 import { Stream } from '../../src/stream'
 import { Subscriber, Subscription } from '../../src/subscribe'
 import { MessageRef } from 'streamr-client-protocol/dist/src/protocol/message_layer'
-import { StreamrClientOptions } from '../../src'
+import { EthereumAddress, StreamrClientOptions } from '../../src'
 import { StorageNode } from '../../src/stream/StorageNode'
 
 import { fakePrivateKey, describeRepeats, getPublishTestMessages, createTestStream } from '../utils'
 import clientOptions from './config'
 
 const MAX_MESSAGES = 10
+jest.setTimeout(30000)
 
 describeRepeats('GapFill', () => {
     let expectErrors = 0 // check no errors by default
@@ -20,13 +21,14 @@ describeRepeats('GapFill', () => {
     let client: StreamrClient
     let stream: Stream
     let subscriber: Subscriber
+    let nodeAddress: EthereumAddress
 
     const createClient = (opts = {}) => {
         const c = new StreamrClient({
             ...clientOptions,
-            auth: {
-                privateKey: fakePrivateKey(),
-            },
+            // auth: {
+            //     privateKey: fakePrivateKey(),
+            // },
             autoConnect: false,
             autoDisconnect: false,
             maxRetries: 2,
@@ -44,10 +46,11 @@ describeRepeats('GapFill', () => {
         subscriber = client.subscriber
         client.debug('connecting before test >>')
         await client.session.getSessionToken()
-        stream = await createTestStream(client, module, {
-            requireSignedData: true
-        })
-        await stream.addToStorageNode(StorageNode.STREAMR_DOCKER_DEV)
+        stream = await createTestStream(client, module, {})
+        nodeAddress = await client.getAddress()
+        await client.setNode(nodeAddress)
+        await stream.addToStorageNode(nodeAddress)
+        // await stream.addToStorageNode(StorageNode.STREAMR_DOCKER_DEV)
 
         client.debug('connecting before test <<')
         publishTestMessages = getPublishTestMessages(client, stream.id)
@@ -329,9 +332,7 @@ describeRepeats('GapFill', () => {
 
             it('rejects resend if no storage assigned', async () => {
                 // new stream, assign to storage node not called
-                stream = await createTestStream(client, module, {
-                    requireSignedData: true,
-                })
+                stream = await createTestStream(client, module, {})
 
                 await expect(async () => {
                     await client.resend({
@@ -459,9 +460,7 @@ describeRepeats('GapFill', () => {
             await client.connect()
             const { parse } = client.connection
             // new stream, assign to storage node not called
-            stream = await createTestStream(client, module, {
-                requireSignedData: true,
-            })
+            stream = await createTestStream(client, module, {})
             const calledResend = jest.fn()
             let count = 0
             let droppedMsgRef: MessageRef
@@ -520,9 +519,7 @@ describeRepeats('GapFill', () => {
 
             await client.connect()
             // new stream, assign to storage node not called
-            stream = await createTestStream(client, module, {
-                requireSignedData: true,
-            })
+            stream = await createTestStream(client, module, {})
 
             const sub = await client.subscribe({
                 stream,
