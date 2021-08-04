@@ -7,7 +7,7 @@ import {
     getStreamId
 } from './common'
 import pkg from '../package.json'
-import { StreamOperation, StreamrClient, StreamPermission } from 'streamr-client'
+import { StreamOperation, StreamrClient } from 'streamr-client'
 import EasyTable from 'easy-table'
 
 const PUBLIC_PERMISSION_ID = 'public'
@@ -24,14 +24,14 @@ const getOperation = (id: string) => {
     }
 }
 
-const getShortOperationId = (operation: StreamOperation) => {
-    const longOperationId = operation as string
-    if (longOperationId.startsWith(OPERATION_PREFIX)) {
-        return longOperationId.substring(OPERATION_PREFIX.length)
-    } else {
-        throw new Error(`Assertion failed: unknown prefix for in ${longOperationId}`)
-    }
-}
+// const getShortOperationId = (operation: StreamOperation) => {
+//     const longOperationId = operation as string
+//     if (longOperationId.startsWith(OPERATION_PREFIX)) {
+//         return longOperationId.substring(OPERATION_PREFIX.length)
+//     } else {
+//         throw new Error(`Assertion failed: unknown prefix for in ${longOperationId}`)
+//     }
+// }
 
 const getTarget = (user: string): string|undefined => {
     if (user === PUBLIC_PERMISSION_ID) {

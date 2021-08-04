@@ -23,10 +23,10 @@ module.exports = {
         templateMainnetAddress: process.env.DU_TEMPLATE_MAINNET || '0x7bFBAe10AE5b5eF45e2aC396E0E605F6658eF3Bc',
         templateSidechainAddress: process.env.DU_TEMPLATE_SIDECHAIN || '0x36afc8c9283CC866b8EB6a61C6e6862a83cd6ee8',
     },
-    streamRegistrySidechainAddress: '0xe89A7982ad52Ebe18C59B2aEE6f8ad167d0E8E72',
-    nodeRegistrySidechainAddress: '0x78c3Af50467Ddb4f29c5c77Ac6F5505b50D04E02',
+    streamRegistrySidechainAddress: '0x642D2B84A32A9A92FEc78CeAA9488388b3704898',
+    nodeRegistrySidechainAddress: '0x338090C5492C5c5E41a4458f5FC4b205cbc54A24',
     ensCacheSidechainAddress: '0xD1d514082ED630687a5DCB85406130eD0745fA06',
-    streamStorageRegistrySidechainAddress: '0x900e59c989edb6899b17E01C5A1914BCBd07d558',
+    streamStorageRegistrySidechainAddress: '0x231b810D98702782963472e1D60a25496999E75D',
     storageNode: {
         address: '0xde1112f631486CfC759A50196853011528bC5FA0',
         url: `http://${process.env.STREAMR_DOCKER_DEV_HOST || '10.200.10.1'}:8891`

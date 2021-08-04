@@ -59,7 +59,14 @@ const createStreamMessageValidator = (config: Config): Protocol.StreamMessageVal
         restUrl: config.streamrUrl + '/api/v1',
     })
     return new Utils.CachingStreamMessageValidator({
-        getStream: (sId) => unauthenticatedClient.getStreamValidationInfo(sId),
+        getStream: async (sId) => {
+            // const stream = await unauthenticatedClient.getStream(sId)
+            await unauthenticatedClient.getStream(sId)
+            return {partitions: 0, 
+                requireSignedData: true,
+                requireEncryptedData: true
+            }
+        },
         isPublisher: (address, sId) => unauthenticatedClient.isStreamPublisher(sId, address),
         isSubscriber: (address, sId) => unauthenticatedClient.isStreamSubscriber(sId, address),
     })
