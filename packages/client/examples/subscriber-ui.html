@@ -1,0 +1,188 @@
+<html>
+<head>
+    <!-- For debug messages, include debug.js and set localStorage.debug = 'StreamrClient'. See from https://github.com/visionmedia/debug -->
+    <script src="../dist/streamr-client.web.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.3.0.min.js"></script>
+    <style>
+        html, body {
+            font-family: sans-serif;
+            width: 100%;
+            height: 100%;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            padding: 2em;
+            display: flex;
+            flex-direction: column;
+            background: #fafafa;
+        }
+
+        #content {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: minmax(200px, 1fr) minmax(500px, 3fr);
+            grid-template-rows: 1fr;
+            grid-column-gap: 2em;
+        }
+
+        #content > * {
+            padding: 2em;
+            display: flex;
+            height: 100%;
+            flex-direction: column;
+            border: 1px solid grey;
+            font-family: monospace;
+            background: #fff;
+            border-radius: 1px;
+        }
+
+    </style>
+
+</head>
+<body>
+    <h1>Real-time telemetrics from trams running in Helsinki, Finland.</h1>
+    <h4>Provided by the local public transport authority (HSL) over MQTT protocol.</h4>
+    <div id="content">
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+<script>
+    const MAX_ROWS = 15
+    const results = document.querySelector('#results')
+    const status = document.querySelector('#status')
+    const toggle = document.querySelector('#toggle')
+
+    var temperature = {
+        x: [Date()],
+        y: [],
+        type: 'scatter',
+        name: 'temperature'
+    };
+
+    var pressure = {
+        x: [Date()],
+        y: [],
+        type: 'scatter'
+    };
+
+    var humidity = {
+        x: [Date()],
+        y: [],
+        type: 'scatter'
+    };
+
+    var data = [temperature, pressure, humidity];
+
+    var layout = {
+    title: 'Temperature',
+    xaxis: {
+       autorange: true
+    },
+    yaxis: {
+        range: [10,40],
+        autorange: true
+    },
+    legend: {
+        y: 0.5,
+        traceorder: 'reversed',
+        font: {
+        size: 16
+        }
+    }
+}
+
+    let plot = Plotly.newPlot('results', data, layout);
+
+
+const resultMessages = []
+    for (let i = 0; i < MAX_ROWS; i++) {
+        results.append(document.createElement('div'))
+    }
+    const log = (msg) => {
+        // tram data moves fast, only show last few rows for performance
+        // resultMessages.unshift(msg)
+        // resultMessages.length = MAX_ROWS
+        // resultMessages.forEach((data, index) => {
+        //     results.childNodes[index].innerHTML = data
+        // })
+    }
+
+    const logStatus = (msg) => {
+        var elem = document.createElement('div')
+        elem.innerHTML = msg
+        status.append(elem)
+    }
+
+    // Create the client with default options
+    const client = new StreamrClient({
+    auth: {
+        privateKey: '0x5e98cce00cff5dea6b454889f359a4ec06b9fa6b88e9d69b86de8e1c81887da0',
+    },
+    url: "ws://13.79.187.190/api/v1/ws",
+    restUrl: "http://13.79.187.190/api/v1"
+    });
+
+
+    async function start() {
+        client.on('connected', function() {
+            logStatus('A connection has been established!')
+        })
+        client.on('disconnected', function() {
+            logStatus('Disconnected.')
+        })
+
+        // Subscribe to a stream
+        const subscription = await client.subscribe({
+            stream: '0xa3d1f77acff0060f7213d7bf3c7fec78df847de1/pi-stream-1',
+            // Resend the last few messages on connect
+            // resend: {
+            //     last: MAX_ROWS,
+            // },
+        }, (data) => {
+            console.log('Received: ' + JSON.stringify(data));
+//            let data = JSON.parse(msg);
+            for (let val of data.sensordatavalues) {
+                switch (val.value_type) {
+                    case "temperature":
+                        temperature.x.push(Date());
+                        temperature.y.push(val.value);
+                        console.log(temperature.y);
+                        break;
+                    default:
+                        continue;
+                }
+            }
+            console.log(temperature.y);
+            Plotly.update('results', data, layout);
+        })
+
+        console.log(subscription)
+
+        logStatus('Subscribed to ' + subscription.streamId)
+        // Event binding examples
+
+        subscription.on('resending', function() {
+            logStatus('Resending from ' + subscription.streamId)
+        })
+
+        subscription.on('resent', function() {
+            logStatus('Resend complete for ' + subscription.streamId)
+        })
+
+        subscription.on('no_resend', function() {
+            logStatus('Nothing to resend for ' + subscription.streamId)
+        })
+    }
+
+    start()
+</script>
+</body>
+</html>

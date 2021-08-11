@@ -1,0 +1,240 @@
+<html>
+<head>
+    <!-- For debug messages, include debug.js and set localStorage.debug = 'StreamrClient'. See from https://github.com/visionmedia/debug -->
+    <script src="../dist/streamr-client.web.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.3.0.min.js"></script>
+    <!-- <style>
+        html, body {
+            font-family: sans-serif;
+            width: 100%;
+            height: 100%;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            padding: 2em;
+            display: flex;
+            flex-direction: column;
+            background: #fafafa;
+        }
+
+        #content {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: minmax(200px, 1fr) minmax(500px, 3fr);
+            grid-template-rows: 1fr;
+            grid-column-gap: 2em;
+        }
+
+        #content > * {
+            padding: 2em;
+            display: flex;
+            height: 100%;
+            flex-direction: column;
+            border: 1px solid grey;
+            font-family: monospace;
+            background: #fff;
+            border-radius: 1px;
+        }
+
+    </style> -->
+
+</head>
+<body>
+<script>
+    const MAX_ROWS = 15
+    const results = document.querySelector('#results')
+    const status = document.querySelector('#status')
+    const toggle = document.querySelector('#toggle')
+
+    const users = [
+        {
+            name: "Admin",
+            address: '0xa3d1F77ACfF0060F7213D7BF3c7fEC78df847De1',
+            key: '0x5e98cce00cff5dea6b454889f359a4ec06b9fa6b88e9d69b86de8e1c81887da0',
+            tokenBalance: '',
+        }
+    ];
+
+
+    // Create the client with default options
+
+
+    async function join() {
+        let ethkey = document.getElementById('ethkey').value;
+        let duaddr = document.getElementById('duaddr').value;
+        console.log('Joining key ' + ethkey + ' to DU ' + duaddr);
+        await joinDu(duaddr, ethkey);
+    }
+
+    async function joinDu(dataUnionContractAddress, memberPrivateKey) {
+        const duMember = new StreamrClient({
+            auth: {
+                privateKey: memberPrivateKey,
+            },
+            url: "ws://13.79.187.190/api/v1/ws",
+            restUrl: "http://13.79.187.190/api/v1",
+            mainnet:"http://13.79.187.190:8545",    // Need this to get DU balances and stats to work
+        });
+        const memberAddress = await duMember.getAddress();
+        //
+        // Get a member view of the data union - we need this to do the join
+        //
+        const dataUnionMemberView = duMember.getDataUnion(dataUnionContractAddress); 
+        console.log("Attempting to join member " + memberAddress + " to DU " + dataUnionMemberView.contractAddress + " ...");
+        const alreadyMember = false; //await dataUnionMemberView.isMember(memberAddress);  gives member(address) error
+        if (alreadyMember) {
+            console.log("Address " + memberAddress + " is already a member of DU " + dataUnionMemberView.contractAddress);
+            duMember.logoutEndpoint();
+            return;
+        }
+        //
+        // Get a secret from the DU - otherwise we have to approve manually in the UI
+        //
+//        const secret = await dataUnion.createSecret();      // Fails if duOwner is not du owner otherwise works
+    
+    //    const plark = await dataUnionMemberView.join(secret)
+        const plark = await dataUnionMemberView.join().then(() => {
+            console.log('Join succeeded');
+        })
+        .catch((err) => {
+            console.log("Error caught when joining a du for member address " + memberAddress);
+            console.log("Has the join actually succeeded?");
+            const actuallyIsMember = dataUnionMemberView.isMember(memberAddress)
+            .then(() => {
+                console.log("Join actually succeeded!");
+                duMember.logoutEndpoint();
+            })
+            .catch(() => {
+                if (actuallyIsMember) {
+                    console.log("Yes it has!");
+                } else {
+                    console.log("No");
+                }
+                duMember.logoutEndpoint();
+            })
+        });
+}
+
+</script>
+<div id="content">
+    <h1>Enviro Sensor Data Publisher</h1>
+    <label for="ethkey">Publisher Ethernet Private Key:</label><br>
+    <div id="inputs">
+        <input type="text" id="ethkey" name="ethkey" required
+            minlength="4" maxlength="68" size="68"><br>
+        
+        <label for="duaddr">Data Union Address:</label><br>
+        <input type="text" id="duaddr" name="duaddr" required
+            minlength="4" maxlength="68" size="68"><br>
+
+        <button id="join">Join</button>
+        <script>
+            document.getElementById('ethkey').value = '0x957a8212980a9a39bf7c03dcbeea3c722d66f2b359c669feceb0e3ba8209a297';
+            document.getElementById('duaddr').value = '0x1750cb96113374db28a507207acb8446779d0fdf';
+            document.getElementById('join').addEventListener('click', join)
+        </script>
+    </div>  <!-- inputs -->
+    <div id="userstatus">
+    <script>
+        let tableDiv = document.getElementById('userstatus');
+        let tableHeaders = ["Name", "Address", "Key", "DATA Balance"];
+        
+        const createTable = () => {
+            while (tableDiv.firstChild) tableDiv.removeChild(tableDiv.firstChild)   // Clear the div
+            
+            let userTable = document.createElement('table');
+            userTable.className = 'userTable';
+
+            let userTableHeader = document.createElement('thead');
+            userTableHeader.className = 'userTableHeader';
+
+            let userTableHeaderRow = document.createElement('tr');
+            userTableHeaderRow.className = 'userTableHeaderRow';
+            //
+            // Add each header
+            //
+            tableHeaders.forEach(header => {
+                let userHeader = document.createElement('th');
+                userHeader.innerText = header;
+                userTableHeaderRow.append(userHeader);
+            });
+            userTableHeader.append(userTableHeaderRow);
+            userTable.append(userTableHeader);
+
+            let userTableBody = document.createElement('tbody');
+            userTableBody.className = "userTableBody";
+            userTable.append(userTableBody);
+
+            return userTable;
+
+        }
+
+        const createUserRow = (user) => {
+            const userTable = document.querySelector('.userTable');
+
+            let userTableRow = document.createElement('tr');
+            userTableRow.className ='userTableRow';
+
+            userTableRow.append(
+                appendItem(user.name),
+                appendItem(user.address),
+                appendItem(user.key),
+                appendItem(user.tokenBalance)
+            );
+
+            // userTable.append(userTableRow);
+            return userTableRow;
+        }
+        
+        const appendItem = (item) => {
+            let td = document.createElement('td');
+            td.innerText = item;
+            return td;
+        }
+
+        const duOwner = new StreamrClient({
+            auth: {
+                privateKey: users[0].key,
+            },
+            url: "ws://13.79.187.190/api/v1/ws",
+            restUrl: "http://13.79.187.190/api/v1",
+            mainnet:"http://13.79.187.190:8545",    // Need this to get DU balances and stats to work
+            tokenAddress: '0xbAA81A0179015bE47Ad439566374F2Bae098686F',
+            tokenSidechainAddress: '0x73Be21733CC5D08e1a14Ea9a399fb27DB3BEf8fF',
+            dataUnion: {
+                minimumWithdrawTokenWei: '1000000',
+                payForTransport: true,
+                factoryMainnetAddress: '0x4bbcBeFBEC587f6C4AF9AF9B48847caEa1Fe81dA',
+                factorySidechainAddress: '0x4A4c4759eb3b7ABee079f832850cD3D0dC48D927',
+                templateMainnetAddress: '0x7bFBAe10AE5b5eF45e2aC396E0E605F6658eF3Bc',
+                templateSidechainAddress: '0x36afc8c9283CC866b8EB6a61C6e6862a83cd6ee8',
+            },
+        });
+        let table = createTable();
+        console.log(table.innerText);
+        tableDiv.append(table);
+
+
+        async function displayUsers() {
+            for (user of users) {
+                let tokenBalance = await duOwner.getTokenBalance(user.address);
+                user.tokenBalance = tokenBalance;
+                table.append(createUserRow(user));
+            }
+        }
+        displayUsers();
+    </script>
+    </div>  <!-- users -->
+
+</div>
+</body>
+
+</html>
